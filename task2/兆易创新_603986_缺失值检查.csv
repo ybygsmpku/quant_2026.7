@@ -1,0 +1,12 @@
+﻿字段名,非空数量,缺失数量,缺失率(%),数据类型
+ts_code,242,0,0.0,str
+trade_date,242,0,0.0,int64
+open,242,0,0.0,float64
+high,242,0,0.0,float64
+low,242,0,0.0,float64
+close,242,0,0.0,float64
+pre_close,242,0,0.0,float64
+change,242,0,0.0,float64
+pct_chg,242,0,0.0,float64
+vol,242,0,0.0,float64
+amount,242,0,0.0,float64
