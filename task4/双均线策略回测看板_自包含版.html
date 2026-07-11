@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双均线策略回测看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f7f5;
+    --bg-tertiary: #f1efe8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5f5e5a;
+    --text-muted: #888780;
+    --border-light: #d3d1c7;
+    --border-mid: #b4b2a9;
+    --blue-50: #E6F1FB; --blue-400: #378ADD; --blue-800: #0C447C;
+    --green-50: #EAF3DE; --green-400: #639922; --green-800: #173404;
+    --red-50: #FCEBEB; --red-400: #E24B4A; --red-800: #791F1F;
+    --amber-50: #FAEEDA; --amber-400: #BA7517;
+    --teal-50: #E1F5EE; --teal-400: #1D9E75; --teal-800: #085041;
+    --purple-50: #EEEDFE; --purple-400: #534AB7; --purple-800: #26215C;
+    --pink-50: #FBEAF0; --pink-400: #D4537E;
+    --coral-400: #D85A30;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    padding: 20px;
+    font-size: 14px;
+  }
+  .dashboard-title {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+  }
+  .dashboard-title span { color: var(--text-muted); font-size: 13px; font-weight: 400; }
+  .grid-top {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+  }
+  .panel-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+  .param-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .param-group { margin-bottom: 8px; }
+  .param-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .param-group input, .param-group select {
+    width: 100%;
+    padding: 6px 10px;
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    outline: none;
+  }
+  .param-group input:focus, .param-group select:focus {
+    border-color: var(--blue-400);
+  }
+  .btn-run {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background: var(--blue-400);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s;
+  }
+  .btn-run:hover { background: var(--blue-800); }
+  .btn-run:disabled { background: var(--text-muted); cursor: not-allowed; }
+  .btn-export {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-export:hover { border-color: var(--blue-400); color: var(--blue-400); }
+  .charts-area {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 12px;
+  }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .chart-box {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    position: relative;
+  }
+  .chart-box h3 {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+  .chart-container { position: relative; width: 100%; height: 320px; }
+  .chart-container-sm { position: relative; width: 100%; height: 220px; }
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .metric-card {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .metric-card .label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .metric-card .value { font-size: 20px; font-weight: 500; color: var(--text-primary); }
+  .metric-card.positive .value { color: var(--green-800); }
+  .metric-card.negative .value { color: var(--red-800); }
+  .metric-card.sharpe { background: var(--purple-50); }
+  .metric-card.sharpe .value { color: var(--purple-800); }
+  .trades-panel {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-top: 16px;
+  }
+  .trades-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .trades-table th {
+    background: var(--bg-secondary);
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 0.5px solid var(--border-light);
+    position: sticky;
+    top: 0;
+  }
+  .trades-table td {
+    padding: 6px;
+    border-bottom: 0.5px solid var(--border-light);
+    color: var(--text-primary);
+  }
+  .trades-table tr.buy td.direction { color: var(--green-400); }
+  .trades-table tr.sell td.direction { color: var(--red-400); }
+  .error-msg {
+    background: var(--red-50);
+    color: var(--red-800);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .loading-overlay {
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(255,255,255,0.85);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--blue-400); z-index: 999;
+  }
+  @media (max-width: 900px) {
+    .grid-top { grid-template-columns: 1fr; }
+    .chart-row { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="dashboard-title">双均线策略回测看板 <span>— 交互式量化策略评估工具</span></div>
+
+<div class="grid-top">
+  <!-- A: 参数面板 -->
+  <div class="panel" id="paramPanel">
+    <div class="panel-title">参数设置</div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>股票代码</label>
+        <input type="text" id="stockCode" value="603986" placeholder="输入6位代码">
+      </div>
+      <div class="param-group">
+        <label>基准指数</label>
+        <select id="benchmarkSelect">
+          <option value="000300">沪深300</option>
+          <option value="fixed02">银行定存 2%</option>
+        </select>
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>开始日期</label>
+        <input type="date" id="startDate" value="2025-07-10">
+      </div>
+      <div class="param-group">
+        <label>结束日期</label>
+        <input type="date" id="endDate" value="2026-07-10">
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>短均线周期</label>
+        <input type="number" id="shortPeriod" value="5" min="2" max="60" step="1">
+      </div>
+      <div class="param-group">
+        <label>长均线周期</label>
+        <input type="number" id="longPeriod" value="20" min="5" max="120" step="1">
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>初始资金 (元)</label>
+        <input type="number" id="initCash" value="100000" min="10000" step="10000">
+      </div>
+      <div class="param-group">
+        <label>手续费率 (%)</label>
+        <input type="number" id="commissionRate" value="0.1" min="0" max="0.3" step="0.01">
+      </div>
+    </div>
+    <div class="param-row">
+      <div class="param-group">
+        <label>滑点比例 (%)</label>
+        <input type="number" id="slippage" value="0.2" min="0" max="1" step="0.01">
+      </div>
+      <div class="param-group">
+        <label>最小交易单位</label>
+        <input type="number" id="lotSize" value="100" min="1" step="1">
+      </div>
+    </div>
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
+    <button class="btn-run" id="btnRun" onclick="runBacktest()">运行回测</button>
+  </div>
+
+  <!-- B: 图表区 -->
+  <div class="charts-area">
+    <div class="chart-box">
+      <h3>K线 + 双均线 + 交易信号</h3>
+      <div class="chart-container"><canvas id="mainChart"></canvas></div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <h3>净值曲线 (策略 vs 基准)</h3>
+        <div class="chart-container-sm"><canvas id="navChart"></canvas></div>
+      </div>
+      <div class="chart-box">
+        <h3>回撤曲线</h3>
+        <div class="chart-container-sm"><canvas id="drawdownChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- C: 指标卡片 -->
+<div class="metrics-grid" id="metricsGrid">
+  <div class="metric-card positive"><div class="label">总收益率</div><div class="value" id="mTotalReturn">--</div></div>
+  <div class="metric-card positive"><div class="label">年化收益率</div><div class="value" id="mAnnualReturn">--</div></div>
+  <div class="metric-card positive"><div class="label">超额收益</div><div class="value" id="mExcessReturn">--</div></div>
+  <div class="metric-card negative"><div class="label">最大回撤</div><div class="value" id="mMaxDrawdown">--</div></div>
+  <div class="metric-card"><div class="label">胜率</div><div class="value" id="mWinRate">--</div></div>
+  <div class="metric-card"><div class="label">盈亏比</div><div class="value" id="mPLRatio">--</div></div>
+  <div class="metric-card sharpe"><div class="label">夏普比率</div><div class="value" id="mSharpe">--</div></div>
+</div>
+
+<!-- D: 交易记录 -->
+<div class="trades-panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="panel-title">交易记录明细</div>
+    <button class="btn-export" id="btnExport" onclick="exportTradesCSV()" style="display:none;">导出 CSV</button>
+  </div>
+  <div style="max-height:300px;overflow-y:auto;">
+    <table class="trades-table" id="tradesTable">
+      <thead><tr><th>#</th><th>日期</th><th>方向</th><th>成交价</th><th>股数</th><th>手续费</th><th>持仓</th><th>净值</th><th>本次盈亏</th></tr></thead>
+      <tbody id="tradesBody"><tr><td colspan="9" style="text-align:center;color:var(--text-muted);">请先运行回测</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ========================================
+// 股票数据映射
+// ========================================
+const STOCK_MAP = {
+  '603986': { name: '兆易创新', data: [{"ts_code": "603986.SH", "trade_date": 20250710.0, "open": 118.85, "high": 119.7, "low": 117.87, "close": 117.89, "pre_close": 119.3, "pct_chg": 0, "vol": 111745.0, "amount": 1320697.7, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250711.0, "open": 117.73, "high": 118.93, "low": 117.2, "close": 118.19, "pre_close": 117.89, "pct_chg": 0.2545, "vol": 129962.0, "amount": 1534839.57, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250714.0, "open": 118.44, "high": 119.03, "low": 117.29, "close": 117.42, "pre_close": 118.19, "pct_chg": -0.6515, "vol": 112955.0, "amount": 1329635.81, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250715.0, "open": 116.93, "high": 117.39, "low": 113.83, "close": 114.83, "pre_close": 117.42, "pct_chg": -2.2058, "vol": 236546.0, "amount": 2714340.72, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250716.0, "open": 114.83, "high": 116.23, "low": 113.83, "close": 114.07, "pre_close": 114.83, "pct_chg": -0.6618, "vol": 158973.0, "amount": 1823560.72, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250717.0, "open": 113.88, "high": 118.02, "low": 113.65, "close": 117.82, "pre_close": 114.07, "pct_chg": 3.2875, "vol": 241626.0, "amount": 2801799.31, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250718.0, "open": 117.69, "high": 120.13, "low": 116.06, "close": 116.99, "pre_close": 117.82, "pct_chg": -0.7045, "vol": 203528.0, "amount": 2387847.75, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250721.0, "open": 116.65, "high": 117.36, "low": 115.23, "close": 116.94, "pre_close": 116.99, "pct_chg": -0.0427, "vol": 116112.0, "amount": 1348724.83, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250722.0, "open": 116.8, "high": 117.16, "low": 115.63, "close": 115.7, "pre_close": 116.94, "pct_chg": -1.0604, "vol": 144136.0, "amount": 1670496.85, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250723.0, "open": 115.6, "high": 118.19, "low": 115.33, "close": 116.82, "pre_close": 115.7, "pct_chg": 0.968, "vol": 149327.0, "amount": 1739174.61, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250724.0, "open": 116.43, "high": 117.83, "low": 114.97, "close": 117.72, "pre_close": 116.82, "pct_chg": 0.7704, "vol": 172504.0, "amount": 2008779.96, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250725.0, "open": 117.73, "high": 121.82, "low": 117.73, "close": 121.76, "pre_close": 117.72, "pct_chg": 3.4319, "vol": 357452.0, "amount": 4280068.58, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250728.0, "open": 121.82, "high": 122.02, "low": 119.54, "close": 120.09, "pre_close": 121.76, "pct_chg": -1.3716, "vol": 191289.0, "amount": 2299540.05, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250729.0, "open": 119.83, "high": 121.32, "low": 119.23, "close": 120.11, "pre_close": 120.09, "pct_chg": 0.0167, "vol": 170187.0, "amount": 2039889.23, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250730.0, "open": 123.88, "high": 129.48, "low": 123.13, "close": 123.81, "pre_close": 120.11, "pct_chg": 3.0805, "vol": 473674.0, "amount": 5948641.99, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250731.0, "open": 120.82, "high": 126.62, "low": 120.11, "close": 120.95, "pre_close": 123.81, "pct_chg": -2.31, "vol": 309196.0, "amount": 3783411.66, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250801.0, "open": 120.33, "high": 121.92, "low": 116.92, "close": 117.14, "pre_close": 120.95, "pct_chg": -3.1501, "vol": 248173.0, "amount": 2941781.85, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250804.0, "open": 116.13, "high": 120.03, "low": 116.13, "close": 118.67, "pre_close": 117.14, "pct_chg": 1.3061, "vol": 161016.0, "amount": 1899570.26, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250805.0, "open": 118.83, "high": 119.13, "low": 117.13, "close": 117.83, "pre_close": 118.67, "pct_chg": -0.7078, "vol": 125032.0, "amount": 1469435.49, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250806.0, "open": 117.83, "high": 118.48, "low": 116.84, "close": 118.11, "pre_close": 117.83, "pct_chg": 0.2376, "vol": 114652.0, "amount": 1347573.56, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250807.0, "open": 117.81, "high": 119.03, "low": 117.15, "close": 117.5, "pre_close": 118.11, "pct_chg": -0.5165, "vol": 170188.0, "amount": 2005005.59, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250808.0, "open": 117.51, "high": 117.51, "low": 116.23, "close": 116.23, "pre_close": 117.5, "pct_chg": -1.0809, "vol": 121689.0, "amount": 1415999.36, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250811.0, "open": 116.62, "high": 118.33, "low": 116.31, "close": 117.78, "pre_close": 116.23, "pct_chg": 1.3336, "vol": 128168.0, "amount": 1506724.6, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250812.0, "open": 118.14, "high": 121.32, "low": 117.43, "close": 120.3, "pre_close": 117.78, "pct_chg": 2.1396, "vol": 253123.0, "amount": 3021326.33, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250813.0, "open": 120.32, "high": 122.82, "low": 119.77, "close": 121.28, "pre_close": 120.3, "pct_chg": 0.8146, "vol": 241336.0, "amount": 2921222.87, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250814.0, "open": 121.52, "high": 125.31, "low": 120.38, "close": 120.83, "pre_close": 121.28, "pct_chg": -0.371, "vol": 314459.0, "amount": 3859594.87, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250815.0, "open": 119.84, "high": 123.32, "low": 119.84, "close": 122.72, "pre_close": 120.83, "pct_chg": 1.5642, "vol": 211807.0, "amount": 2586539.09, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250818.0, "open": 123.15, "high": 127.79, "low": 121.33, "close": 125.52, "pre_close": 122.72, "pct_chg": 2.2816, "vol": 328975.0, "amount": 4100613.49, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250819.0, "open": 125.3, "high": 128.69, "low": 122.67, "close": 123.08, "pre_close": 125.52, "pct_chg": -1.9439, "vol": 323644.0, "amount": 4040496.74, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250820.0, "open": 122.82, "high": 127.07, "low": 121.83, "close": 126.83, "pre_close": 123.08, "pct_chg": 3.0468, "vol": 360420.0, "amount": 4487556.07, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250821.0, "open": 131.9, "high": 139.51, "low": 131.9, "close": 136.96, "pre_close": 126.83, "pct_chg": 7.9871, "vol": 860219.0, "amount": 11815327.14, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250822.0, "open": 134.92, "high": 150.66, "low": 134.88, "close": 150.66, "pre_close": 136.96, "pct_chg": 10.0029, "vol": 781924.0, "amount": 11194731.71, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250825.0, "open": 158.77, "high": 163.26, "low": 152.66, "close": 157.57, "pre_close": 150.66, "pct_chg": 4.5865, "vol": 837412.0, "amount": 13153034.84, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250826.0, "open": 157.57, "high": 157.57, "low": 152.4, "close": 154.18, "pre_close": 157.57, "pct_chg": -2.1514, "vol": 382808.0, "amount": 5909070.47, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250827.0, "open": 155.64, "high": 168.26, "low": 151.96, "close": 158.4, "pre_close": 154.18, "pct_chg": 2.7371, "vol": 624716.0, "amount": 9999605.38, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250828.0, "open": 160.77, "high": 165.56, "low": 158.78, "close": 164.21, "pre_close": 158.4, "pct_chg": 3.6679, "vol": 495046.0, "amount": 8016320.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250829.0, "open": 161.57, "high": 161.77, "low": 156.17, "close": 158.75, "pre_close": 164.21, "pct_chg": -3.325, "vol": 398584.0, "amount": 6315878.28, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250901.0, "open": 163.87, "high": 174.63, "low": 156.77, "close": 174.63, "pre_close": 158.75, "pct_chg": 10.0031, "vol": 613687.0, "amount": 10208519.09, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250902.0, "open": 179.02, "high": 187.73, "low": 172.8, "close": 175.74, "pre_close": 174.63, "pct_chg": 0.6356, "vol": 763960.0, "amount": 13716110.61, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250903.0, "open": 176.0, "high": 177.47, "low": 168.31, "close": 170.84, "pre_close": 175.74, "pct_chg": -2.7882, "vol": 441917.0, "amount": 7576033.34, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250904.0, "open": 168.75, "high": 170.82, "low": 153.76, "close": 153.76, "pre_close": 170.84, "pct_chg": -9.9977, "vol": 455641.0, "amount": 7273673.44, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250905.0, "open": 149.78, "high": 163.75, "low": 145.59, "close": 159.33, "pre_close": 153.76, "pct_chg": 3.6225, "vol": 700503.0, "amount": 10684624.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250908.0, "open": 161.7, "high": 168.75, "low": 158.92, "close": 163.59, "pre_close": 159.33, "pct_chg": 2.6737, "vol": 524475.0, "amount": 8590200.02, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250909.0, "open": 160.77, "high": 162.56, "low": 154.4, "close": 156.92, "pre_close": 163.59, "pct_chg": -4.0773, "vol": 327796.0, "amount": 5184297.61, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250910.0, "open": 156.91, "high": 163.01, "low": 155.47, "close": 161.06, "pre_close": 156.92, "pct_chg": 2.6383, "vol": 335143.0, "amount": 5350600.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250911.0, "open": 161.03, "high": 177.16, "low": 159.77, "close": 177.16, "pre_close": 161.06, "pct_chg": 9.9963, "vol": 555229.0, "amount": 9409301.02, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250912.0, "open": 179.73, "high": 194.88, "low": 177.24, "close": 189.93, "pre_close": 177.16, "pct_chg": 7.2082, "vol": 711388.0, "amount": 13413046.66, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250915.0, "open": 193.23, "high": 194.22, "low": 186.35, "close": 190.66, "pre_close": 189.93, "pct_chg": 0.3844, "vol": 496202.0, "amount": 9456126.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250916.0, "open": 188.73, "high": 196.51, "low": 186.62, "close": 188.89, "pre_close": 190.66, "pct_chg": -0.9284, "vol": 409155.0, "amount": 7798917.32, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250917.0, "open": 188.72, "high": 192.3, "low": 182.7, "close": 186.33, "pre_close": 188.89, "pct_chg": -1.3553, "vol": 339738.0, "amount": 6349387.34, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250918.0, "open": 189.12, "high": 200.56, "low": 186.53, "close": 190.6, "pre_close": 186.33, "pct_chg": 2.2916, "vol": 591268.0, "amount": 11365350.23, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250919.0, "open": 194.03, "high": 195.6, "low": 184.64, "close": 184.93, "pre_close": 190.6, "pct_chg": -2.9748, "vol": 372458.0, "amount": 7041054.92, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250922.0, "open": 188.61, "high": 197.8, "low": 186.01, "close": 194.73, "pre_close": 184.93, "pct_chg": 5.2993, "vol": 412576.0, "amount": 7990905.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250923.0, "open": 195.72, "high": 201.3, "low": 188.42, "close": 193.79, "pre_close": 194.73, "pct_chg": -0.4827, "vol": 400526.0, "amount": 7769550.25, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250924.0, "open": 194.32, "high": 207.93, "low": 192.72, "close": 199.51, "pre_close": 193.79, "pct_chg": 2.9516, "vol": 507757.0, "amount": 10150767.62, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250925.0, "open": 198.71, "high": 204.2, "low": 192.82, "close": 197.12, "pre_close": 199.51, "pct_chg": -1.1979, "vol": 404863.0, "amount": 7989722.05, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250926.0, "open": 195.73, "high": 205.72, "low": 189.93, "close": 189.93, "pre_close": 197.12, "pct_chg": -3.6475, "vol": 435833.0, "amount": 8638308.4, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250929.0, "open": 196.22, "high": 203.33, "low": 194.82, "close": 196.84, "pre_close": 189.93, "pct_chg": 3.6382, "vol": 435509.0, "amount": 8616427.92, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20250930.0, "open": 204.04, "high": 216.53, "low": 202.71, "close": 212.99, "pre_close": 196.84, "pct_chg": 8.2046, "vol": 598733.0, "amount": 12653693.46, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251009.0, "open": 221.68, "high": 234.29, "low": 218.28, "close": 225.16, "pre_close": 212.99, "pct_chg": 5.7139, "vol": 586240.0, "amount": 13274149.4, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251010.0, "open": 225.17, "high": 230.17, "low": 211.81, "close": 214.71, "pre_close": 225.16, "pct_chg": -4.6411, "vol": 443674.0, "amount": 9622665.19, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251013.0, "open": 201.21, "high": 214.59, "low": 201.21, "close": 207.55, "pre_close": 214.71, "pct_chg": -3.3347, "vol": 425432.0, "amount": 8830292.8, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251014.0, "open": 215.14, "high": 220.21, "low": 192.72, "close": 195.72, "pre_close": 207.55, "pct_chg": -5.6998, "vol": 522776.0, "amount": 10746581.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251015.0, "open": 195.27, "high": 202.11, "low": 186.14, "close": 201.72, "pre_close": 195.72, "pct_chg": 3.0656, "vol": 391009.0, "amount": 7576280.98, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251016.0, "open": 201.15, "high": 214.49, "low": 198.24, "close": 207.83, "pre_close": 201.72, "pct_chg": 3.029, "vol": 459332.0, "amount": 9563712.22, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251017.0, "open": 207.82, "high": 211.19, "low": 200.71, "close": 200.92, "pre_close": 207.83, "pct_chg": -3.3248, "vol": 329836.0, "amount": 6767208.96, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251020.0, "open": 207.43, "high": 214.69, "low": 202.74, "close": 208.05, "pre_close": 200.92, "pct_chg": 3.5487, "vol": 367777.0, "amount": 7685088.96, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251021.0, "open": 210.69, "high": 221.68, "low": 209.36, "close": 218.69, "pre_close": 208.05, "pct_chg": 5.1142, "vol": 405705.0, "amount": 8781405.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251022.0, "open": 213.69, "high": 213.69, "low": 205.0, "close": 210.62, "pre_close": 218.69, "pct_chg": -3.6902, "vol": 372369.0, "amount": 7754775.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251023.0, "open": 205.68, "high": 207.8, "low": 200.1, "close": 206.66, "pre_close": 210.62, "pct_chg": -1.8802, "vol": 274456.0, "amount": 5577385.36, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251024.0, "open": 213.69, "high": 221.56, "low": 211.69, "close": 220.76, "pre_close": 206.66, "pct_chg": 6.8228, "vol": 451272.0, "amount": 9790898.27, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251027.0, "open": 229.67, "high": 242.84, "low": 222.51, "close": 242.84, "pre_close": 220.76, "pct_chg": 10.0018, "vol": 521672.0, "amount": 12052873.21, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251028.0, "open": 236.16, "high": 254.07, "low": 234.24, "close": 246.59, "pre_close": 242.84, "pct_chg": 1.5442, "vol": 528062.0, "amount": 12891243.44, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251029.0, "open": 246.6, "high": 252.26, "low": 235.66, "close": 240.8, "pre_close": 246.59, "pct_chg": -2.348, "vol": 504476.0, "amount": 12203844.75, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251030.0, "open": 245.88, "high": 246.64, "low": 231.44, "close": 231.66, "pre_close": 240.8, "pct_chg": -3.7957, "vol": 434284.0, "amount": 10330841.38, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251031.0, "open": 230.67, "high": 234.34, "low": 215.69, "close": 219.68, "pre_close": 231.66, "pct_chg": -5.1714, "vol": 493144.0, "amount": 10866798.2, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251103.0, "open": 216.69, "high": 230.35, "low": 216.35, "close": 229.77, "pre_close": 219.68, "pct_chg": 4.593, "vol": 463285.0, "amount": 10352450.27, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251104.0, "open": 230.67, "high": 230.88, "low": 222.18, "close": 224.66, "pre_close": 229.77, "pct_chg": -2.224, "vol": 293794.0, "amount": 6614754.77, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251105.0, "open": 212.69, "high": 220.17, "low": 210.64, "close": 218.07, "pre_close": 224.66, "pct_chg": -2.9333, "vol": 335618.0, "amount": 7192762.79, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251106.0, "open": 224.17, "high": 227.67, "low": 221.93, "close": 226.87, "pre_close": 218.07, "pct_chg": 4.0354, "vol": 343845.0, "amount": 7742560.22, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251107.0, "open": 222.36, "high": 227.56, "low": 219.23, "close": 220.63, "pre_close": 226.87, "pct_chg": -2.7505, "vol": 279394.0, "amount": 6223913.62, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251110.0, "open": 228.16, "high": 231.11, "low": 212.19, "close": 218.64, "pre_close": 220.63, "pct_chg": -0.902, "vol": 386392.0, "amount": 8541568.25, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251111.0, "open": 223.28, "high": 226.68, "low": 216.4, "close": 216.68, "pre_close": 218.64, "pct_chg": -0.8965, "vol": 342421.0, "amount": 7590292.56, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251112.0, "open": 212.69, "high": 218.26, "low": 206.71, "close": 209.2, "pre_close": 216.68, "pct_chg": -3.4521, "vol": 350031.0, "amount": 7380997.74, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251113.0, "open": 211.69, "high": 230.12, "low": 211.57, "close": 227.17, "pre_close": 209.2, "pct_chg": 8.5899, "vol": 627548.0, "amount": 14141134.36, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251114.0, "open": 215.69, "high": 216.18, "low": 205.48, "close": 205.48, "pre_close": 227.17, "pct_chg": -9.5479, "vol": 549430.0, "amount": 11514599.47, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251117.0, "open": 207.51, "high": 214.43, "low": 206.06, "close": 207.2, "pre_close": 205.48, "pct_chg": 0.8371, "vol": 335547.0, "amount": 7019124.58, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251118.0, "open": 204.98, "high": 207.28, "low": 201.28, "close": 202.21, "pre_close": 207.2, "pct_chg": -2.4083, "vol": 274777.0, "amount": 5588496.65, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251119.0, "open": 199.96, "high": 205.2, "low": 198.74, "close": 202.23, "pre_close": 202.21, "pct_chg": 0.0099, "vol": 239165.0, "amount": 4828253.43, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251120.0, "open": 207.2, "high": 207.7, "low": 198.37, "close": 198.81, "pre_close": 202.23, "pct_chg": -1.6911, "vol": 217921.0, "amount": 4370203.59, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251121.0, "open": 188.73, "high": 190.29, "low": 182.25, "close": 182.25, "pre_close": 198.81, "pct_chg": -8.3296, "vol": 405003.0, "amount": 7501904.02, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251124.0, "open": 183.48, "high": 184.48, "low": 175.74, "close": 178.92, "pre_close": 182.25, "pct_chg": -1.8272, "vol": 340994.0, "amount": 6093711.6, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251125.0, "open": 184.73, "high": 191.32, "low": 183.92, "close": 190.34, "pre_close": 178.92, "pct_chg": 6.3827, "vol": 364550.0, "amount": 6835565.36, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251126.0, "open": 186.74, "high": 198.59, "low": 186.53, "close": 196.22, "pre_close": 190.34, "pct_chg": 3.0892, "vol": 298117.0, "amount": 5788098.22, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251127.0, "open": 198.59, "high": 207.7, "low": 198.59, "close": 200.57, "pre_close": 196.22, "pct_chg": 2.2169, "vol": 320196.0, "amount": 6526163.04, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251128.0, "open": 198.71, "high": 204.05, "low": 196.37, "close": 202.71, "pre_close": 200.57, "pct_chg": 1.067, "vol": 215965.0, "amount": 4328230.85, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251201.0, "open": 203.74, "high": 215.14, "low": 200.91, "close": 212.51, "pre_close": 202.71, "pct_chg": 4.8345, "vol": 383226.0, "amount": 7989761.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251202.0, "open": 211.47, "high": 216.48, "low": 207.8, "close": 210.19, "pre_close": 212.51, "pct_chg": -1.0917, "vol": 249606.0, "amount": 5275735.12, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251203.0, "open": 210.11, "high": 210.68, "low": 205.89, "close": 207.3, "pre_close": 210.19, "pct_chg": -1.3749, "vol": 170956.0, "amount": 3545151.35, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251204.0, "open": 205.7, "high": 212.67, "low": 201.7, "close": 210.1, "pre_close": 207.3, "pct_chg": 1.3507, "vol": 247366.0, "amount": 5122941.05, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251205.0, "open": 210.61, "high": 210.69, "low": 205.2, "close": 206.51, "pre_close": 210.1, "pct_chg": -1.7087, "vol": 170064.0, "amount": 3512359.78, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251208.0, "open": 208.32, "high": 216.66, "low": 207.23, "close": 213.58, "pre_close": 206.51, "pct_chg": 3.4236, "vol": 311759.0, "amount": 6615327.08, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251209.0, "open": 211.69, "high": 214.99, "low": 209.0, "close": 210.64, "pre_close": 213.58, "pct_chg": -1.3765, "vol": 210892.0, "amount": 4457978.8, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251210.0, "open": 208.79, "high": 209.9, "low": 203.2, "close": 208.54, "pre_close": 210.64, "pct_chg": -0.997, "vol": 192089.0, "amount": 3966688.84, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251211.0, "open": 211.57, "high": 212.69, "low": 207.2, "close": 207.51, "pre_close": 208.54, "pct_chg": -0.4939, "vol": 188519.0, "amount": 3947314.81, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251212.0, "open": 205.7, "high": 214.13, "low": 203.71, "close": 209.59, "pre_close": 207.51, "pct_chg": 1.0024, "vol": 215346.0, "amount": 4481760.53, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251215.0, "open": 204.72, "high": 208.38, "low": 203.2, "close": 203.86, "pre_close": 209.59, "pct_chg": -2.7339, "vol": 175324.0, "amount": 3584385.46, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251216.0, "open": 202.71, "high": 205.16, "low": 195.85, "close": 197.57, "pre_close": 203.86, "pct_chg": -3.0855, "vol": 205122.0, "amount": 4073077.93, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251217.0, "open": 196.72, "high": 202.58, "low": 195.67, "close": 201.89, "pre_close": 197.57, "pct_chg": 2.1866, "vol": 190778.0, "amount": 3797345.82, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251218.0, "open": 203.2, "high": 218.56, "low": 203.2, "close": 214.14, "pre_close": 201.89, "pct_chg": 6.0677, "vol": 419132.0, "amount": 8874361.81, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251219.0, "open": 219.68, "high": 220.68, "low": 207.9, "close": 209.91, "pre_close": 214.14, "pct_chg": -1.9753, "vol": 332877.0, "amount": 7024678.04, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251222.0, "open": 213.2, "high": 219.18, "low": 213.2, "close": 216.15, "pre_close": 209.91, "pct_chg": 2.9727, "vol": 254069.0, "amount": 5477582.04, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251223.0, "open": 216.68, "high": 221.01, "low": 214.69, "close": 217.06, "pre_close": 216.15, "pct_chg": 0.421, "vol": 254667.0, "amount": 5535256.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251224.0, "open": 219.68, "high": 224.67, "low": 215.89, "close": 223.78, "pre_close": 217.06, "pct_chg": 3.0959, "vol": 298843.0, "amount": 6580916.27, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251225.0, "open": 222.68, "high": 228.5, "low": 217.01, "close": 221.68, "pre_close": 223.78, "pct_chg": -0.9384, "vol": 259777.0, "amount": 5744258.21, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251226.0, "open": 220.68, "high": 229.67, "low": 219.68, "close": 226.64, "pre_close": 221.68, "pct_chg": 2.2375, "vol": 297062.0, "amount": 6713060.09, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251229.0, "open": 225.38, "high": 234.1, "low": 224.67, "close": 227.6, "pre_close": 226.64, "pct_chg": 0.4236, "vol": 296449.0, "amount": 6762351.75, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251230.0, "open": 225.67, "high": 229.21, "low": 218.78, "close": 219.9, "pre_close": 227.6, "pct_chg": -3.3831, "vol": 272004.0, "amount": 6054822.13, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20251231.0, "open": 227.68, "high": 228.55, "low": 212.27, "close": 213.94, "pre_close": 219.9, "pct_chg": -2.7103, "vol": 355086.0, "amount": 7729864.69, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260105.0, "open": 221.0, "high": 235.34, "low": 220.68, "close": 235.34, "pre_close": 213.94, "pct_chg": 10.0028, "vol": 500009.0, "amount": 11544018.3, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260106.0, "open": 237.65, "high": 252.96, "low": 233.66, "close": 250.42, "pre_close": 235.34, "pct_chg": 6.4078, "vol": 508272.0, "amount": 12292782.01, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260107.0, "open": 269.61, "high": 273.37, "low": 256.41, "close": 262.12, "pre_close": 250.42, "pct_chg": 4.6722, "vol": 545953.0, "amount": 14422446.2, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260108.0, "open": 258.62, "high": 266.61, "low": 256.54, "close": 258.37, "pre_close": 262.12, "pct_chg": -1.4306, "vol": 314565.0, "amount": 8198604.9, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260109.0, "open": 254.18, "high": 254.18, "low": 243.97, "close": 249.69, "pre_close": 258.37, "pct_chg": -3.3595, "vol": 395812.0, "amount": 9858897.45, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260112.0, "open": 254.85, "high": 263.66, "low": 253.63, "close": 261.45, "pre_close": 249.69, "pct_chg": 4.7098, "vol": 404399.0, "amount": 10420664.07, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260113.0, "open": 265.61, "high": 274.6, "low": 257.12, "close": 263.12, "pre_close": 261.45, "pct_chg": 0.6387, "vol": 462188.0, "amount": 12220931.2, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260114.0, "open": 269.61, "high": 270.61, "low": 248.69, "close": 252.63, "pre_close": 263.12, "pct_chg": -3.9868, "vol": 447971.0, "amount": 11529460.93, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260115.0, "open": 249.25, "high": 257.18, "low": 247.84, "close": 254.59, "pre_close": 252.63, "pct_chg": 0.7758, "vol": 284311.0, "amount": 7170020.2, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260116.0, "open": 259.65, "high": 280.05, "low": 257.13, "close": 280.05, "pre_close": 254.59, "pct_chg": 10.0004, "vol": 554166.0, "amount": 14998343.96, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260119.0, "open": 280.19, "high": 291.58, "low": 278.48, "close": 288.03, "pre_close": 280.05, "pct_chg": 2.8495, "vol": 463902.0, "amount": 13222002.04, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260120.0, "open": 282.49, "high": 296.67, "low": 282.47, "close": 291.58, "pre_close": 288.03, "pct_chg": 1.2325, "vol": 390348.0, "amount": 11360935.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260121.0, "open": 294.57, "high": 314.34, "low": 292.59, "close": 307.2, "pre_close": 291.58, "pct_chg": 5.357, "vol": 405241.0, "amount": 12377738.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260122.0, "open": 319.54, "high": 319.56, "low": 296.27, "close": 301.03, "pre_close": 307.2, "pct_chg": -2.0085, "vol": 451271.0, "amount": 13691089.64, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260123.0, "open": 295.57, "high": 310.23, "low": 294.57, "close": 296.82, "pre_close": 301.03, "pct_chg": -1.3985, "vol": 349887.0, "amount": 10476571.11, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260126.0, "open": 299.57, "high": 307.55, "low": 290.08, "close": 292.18, "pre_close": 296.82, "pct_chg": -1.5632, "vol": 273071.0, "amount": 8047356.05, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260127.0, "open": 289.58, "high": 311.97, "low": 286.25, "close": 306.81, "pre_close": 292.18, "pct_chg": 5.0072, "vol": 380595.0, "amount": 11449129.53, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260128.0, "open": 313.42, "high": 328.1, "low": 313.42, "close": 323.21, "pre_close": 306.81, "pct_chg": 5.3453, "vol": 377728.0, "amount": 12142734.05, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260129.0, "open": 329.4, "high": 330.59, "low": 306.54, "close": 307.05, "pre_close": 323.21, "pct_chg": -4.9998, "vol": 334731.0, "amount": 10578442.68, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260130.0, "open": 314.54, "high": 320.41, "low": 307.56, "close": 314.42, "pre_close": 307.05, "pct_chg": 2.4003, "vol": 376746.0, "amount": 11847630.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260202.0, "open": 300.36, "high": 305.65, "low": 282.98, "close": 282.98, "pre_close": 314.42, "pct_chg": -9.9994, "vol": 416893.0, "amount": 12077105.6, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260203.0, "open": 293.58, "high": 296.17, "low": 284.79, "close": 292.15, "pre_close": 282.98, "pct_chg": 3.2405, "vol": 302652.0, "amount": 8799936.09, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260204.0, "open": 285.58, "high": 289.08, "low": 278.6, "close": 281.92, "pre_close": 292.15, "pct_chg": -3.5016, "vol": 271351.0, "amount": 7635490.3, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260205.0, "open": 269.55, "high": 279.11, "low": 267.82, "close": 277.34, "pre_close": 281.92, "pct_chg": -1.6246, "vol": 229386.0, "amount": 6291627.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260206.0, "open": 270.61, "high": 280.1, "low": 267.81, "close": 275.77, "pre_close": 277.34, "pct_chg": -0.5661, "vol": 186538.0, "amount": 5128643.66, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260209.0, "open": 283.56, "high": 294.01, "low": 279.79, "close": 292.56, "pre_close": 275.77, "pct_chg": 6.0884, "vol": 283466.0, "amount": 8136309.84, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260210.0, "open": 286.71, "high": 291.08, "low": 283.76, "close": 289.48, "pre_close": 292.56, "pct_chg": -1.0528, "vol": 216279.0, "amount": 6216434.04, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260211.0, "open": 284.59, "high": 286.08, "low": 280.09, "close": 284.18, "pre_close": 289.48, "pct_chg": -1.8309, "vol": 173667.0, "amount": 4915041.76, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260212.0, "open": 290.08, "high": 304.56, "low": 284.59, "close": 302.8, "pre_close": 284.18, "pct_chg": 6.5522, "vol": 301111.0, "amount": 8829833.67, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260213.0, "open": 302.8, "high": 317.14, "low": 300.56, "close": 308.25, "pre_close": 302.8, "pct_chg": 1.7999, "vol": 299688.0, "amount": 9321744.07, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260224.0, "open": 317.04, "high": 330.68, "low": 310.55, "close": 322.58, "pre_close": 308.25, "pct_chg": 4.6488, "vol": 302985.0, "amount": 9695148.67, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260225.0, "open": 315.54, "high": 316.55, "low": 301.52, "close": 310.87, "pre_close": 322.58, "pct_chg": -3.6301, "vol": 286143.0, "amount": 8833201.62, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260226.0, "open": 315.54, "high": 315.54, "low": 305.61, "close": 308.95, "pre_close": 310.87, "pct_chg": -0.6176, "vol": 231388.0, "amount": 7159389.73, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260227.0, "open": 303.06, "high": 305.56, "low": 296.26, "close": 299.57, "pre_close": 308.95, "pct_chg": -3.0361, "vol": 221290.0, "amount": 6620142.35, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260302.0, "open": 290.45, "high": 299.55, "low": 290.13, "close": 292.73, "pre_close": 299.57, "pct_chg": -2.2833, "vol": 185401.0, "amount": 5445894.63, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260303.0, "open": 294.57, "high": 295.67, "low": 272.19, "close": 272.49, "pre_close": 292.73, "pct_chg": -6.9142, "vol": 333778.0, "amount": 9343284.74, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260304.0, "open": 272.49, "high": 289.58, "low": 272.49, "close": 278.67, "pre_close": 272.49, "pct_chg": 2.268, "vol": 327391.0, "amount": 9236625.83, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260305.0, "open": 287.74, "high": 289.46, "low": 279.82, "close": 282.39, "pre_close": 278.67, "pct_chg": 1.3349, "vol": 255670.0, "amount": 7278239.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260306.0, "open": 277.5, "high": 288.46, "low": 277.16, "close": 284.58, "pre_close": 282.39, "pct_chg": 0.7755, "vol": 208879.0, "amount": 5923119.23, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260309.0, "open": 272.6, "high": 277.3, "low": 263.62, "close": 275.69, "pre_close": 284.58, "pct_chg": -3.1239, "vol": 283957.0, "amount": 7638462.12, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260310.0, "open": 283.69, "high": 286.08, "low": 280.77, "close": 285.03, "pre_close": 275.69, "pct_chg": 3.3879, "vol": 233876.0, "amount": 6630406.32, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260311.0, "open": 287.62, "high": 290.41, "low": 280.91, "close": 281.12, "pre_close": 285.03, "pct_chg": -1.3718, "vol": 216813.0, "amount": 6167167.66, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260312.0, "open": 279.42, "high": 283.42, "low": 272.04, "close": 274.38, "pre_close": 281.12, "pct_chg": -2.3976, "vol": 172578.0, "amount": 4761565.03, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260313.0, "open": 270.39, "high": 285.26, "low": 270.39, "close": 277.93, "pre_close": 274.38, "pct_chg": 1.2938, "vol": 226466.0, "amount": 6291988.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260316.0, "open": 279.59, "high": 305.72, "low": 276.6, "close": 305.72, "pre_close": 277.93, "pct_chg": 9.9989, "vol": 463407.0, "amount": 13580790.14, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260317.0, "open": 306.06, "high": 312.55, "low": 295.45, "close": 295.57, "pre_close": 305.72, "pct_chg": -3.32, "vol": 390567.0, "amount": 11808345.19, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260318.0, "open": 304.66, "high": 313.23, "low": 301.56, "close": 310.8, "pre_close": 295.57, "pct_chg": 5.1528, "vol": 421124.0, "amount": 12976726.17, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260319.0, "open": 299.57, "high": 309.26, "low": 296.57, "close": 303.24, "pre_close": 310.8, "pct_chg": -2.4324, "vol": 312599.0, "amount": 9429998.68, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260320.0, "open": 305.11, "high": 306.26, "low": 289.58, "close": 289.78, "pre_close": 303.24, "pct_chg": -4.4387, "vol": 312990.0, "amount": 9245696.44, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260323.0, "open": 276.6, "high": 282.47, "low": 270.61, "close": 272.95, "pre_close": 289.78, "pct_chg": -5.8079, "vol": 282552.0, "amount": 7794896.24, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260324.0, "open": 277.59, "high": 277.6, "low": 256.51, "close": 273.31, "pre_close": 272.95, "pct_chg": 0.1319, "vol": 337404.0, "amount": 8923345.0, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260325.0, "open": 274.75, "high": 285.39, "low": 274.74, "close": 278.0, "pre_close": 273.31, "pct_chg": 1.716, "vol": 284175.0, "amount": 7936453.14, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260326.0, "open": 267.61, "high": 268.31, "low": 259.62, "close": 261.62, "pre_close": 278.0, "pct_chg": -5.8921, "vol": 351282.0, "amount": 9204571.78, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260327.0, "open": 248.62, "high": 259.8, "low": 239.9, "close": 258.29, "pre_close": 261.62, "pct_chg": -1.2728, "vol": 290194.0, "amount": 7281026.18, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260330.0, "open": 251.63, "high": 259.16, "low": 249.67, "close": 255.48, "pre_close": 258.29, "pct_chg": -1.0879, "vol": 215008.0, "amount": 5462237.83, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260331.0, "open": 249.54, "high": 251.63, "low": 236.52, "close": 237.75, "pre_close": 255.48, "pct_chg": -6.9399, "vol": 428244.0, "amount": 10362624.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260401.0, "open": 249.64, "high": 255.73, "low": 243.35, "close": 254.63, "pre_close": 237.75, "pct_chg": 7.0999, "vol": 388521.0, "amount": 9679086.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260402.0, "open": 257.49, "high": 259.42, "low": 245.24, "close": 246.63, "pre_close": 254.63, "pct_chg": -3.1418, "vol": 253342.0, "amount": 6357876.62, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260403.0, "open": 250.63, "high": 254.23, "low": 247.14, "close": 248.74, "pre_close": 246.63, "pct_chg": 0.8555, "vol": 197759.0, "amount": 4941219.0, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260407.0, "open": 252.73, "high": 255.59, "low": 248.45, "close": 249.3, "pre_close": 248.74, "pct_chg": 0.2251, "vol": 198760.0, "amount": 5004067.5, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260408.0, "open": 249.75, "high": 256.59, "low": 242.73, "close": 255.59, "pre_close": 249.3, "pct_chg": 2.5231, "vol": 754419.0, "amount": 18839409.19, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260409.0, "open": 249.64, "high": 253.12, "low": 243.55, "close": 250.13, "pre_close": 255.59, "pct_chg": -2.1362, "vol": 445328.0, "amount": 11037658.85, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260410.0, "open": 255.12, "high": 267.93, "low": 254.87, "close": 264.71, "pre_close": 250.13, "pct_chg": 5.829, "vol": 535543.0, "amount": 14059881.68, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260413.0, "open": 260.62, "high": 269.45, "low": 260.52, "close": 261.76, "pre_close": 264.71, "pct_chg": -1.1144, "vol": 413020.0, "amount": 10880433.03, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260414.0, "open": 269.11, "high": 280.82, "low": 266.0, "close": 279.6, "pre_close": 261.76, "pct_chg": 6.8154, "vol": 466882.0, "amount": 12842561.59, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260415.0, "open": 284.59, "high": 287.23, "low": 271.59, "close": 273.6, "pre_close": 279.6, "pct_chg": -2.1459, "vol": 397549.0, "amount": 11055656.18, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260416.0, "open": 269.71, "high": 286.58, "low": 268.2, "close": 286.31, "pre_close": 273.6, "pct_chg": 4.6455, "vol": 409931.0, "amount": 11415048.13, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260417.0, "open": 283.59, "high": 295.23, "low": 282.49, "close": 288.54, "pre_close": 286.31, "pct_chg": 0.7789, "vol": 406911.0, "amount": 11751270.17, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260420.0, "open": 292.58, "high": 295.53, "low": 286.7, "close": 290.12, "pre_close": 288.54, "pct_chg": 0.5476, "vol": 326116.0, "amount": 9475951.99, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260421.0, "open": 290.38, "high": 308.55, "low": 287.83, "close": 305.83, "pre_close": 290.12, "pct_chg": 5.415, "vol": 426452.0, "amount": 12808839.45, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260422.0, "open": 303.06, "high": 314.12, "low": 302.07, "close": 313.52, "pre_close": 305.83, "pct_chg": 2.5145, "vol": 342158.0, "amount": 10544337.67, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260423.0, "open": 325.54, "high": 325.55, "low": 301.46, "close": 304.36, "pre_close": 313.52, "pct_chg": -2.9217, "vol": 442639.0, "amount": 13689754.45, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260424.0, "open": 304.56, "high": 309.55, "low": 292.39, "close": 297.27, "pre_close": 304.36, "pct_chg": -2.3295, "vol": 349612.0, "amount": 10421145.41, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260427.0, "open": 301.15, "high": 309.13, "low": 297.32, "close": 302.98, "pre_close": 297.27, "pct_chg": 1.9208, "vol": 316814.0, "amount": 9580536.4, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260428.0, "open": 304.56, "high": 318.87, "low": 301.58, "close": 307.05, "pre_close": 302.98, "pct_chg": 1.3433, "vol": 368477.0, "amount": 11405206.76, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260429.0, "open": 302.57, "high": 311.21, "low": 296.57, "close": 308.44, "pre_close": 307.05, "pct_chg": 0.4527, "vol": 419808.0, "amount": 12769334.75, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260430.0, "open": 319.54, "high": 320.53, "low": 306.04, "close": 312.54, "pre_close": 308.44, "pct_chg": 1.3293, "vol": 588819.0, "amount": 18490002.84, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260506.0, "open": 329.52, "high": 343.79, "low": 329.52, "close": 343.79, "pre_close": 312.54, "pct_chg": 9.9987, "vol": 424040.0, "amount": 14444233.39, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260507.0, "open": 346.5, "high": 356.84, "low": 338.51, "close": 349.65, "pre_close": 343.79, "pct_chg": 1.7045, "vol": 524639.0, "amount": 18148201.01, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260508.0, "open": 340.51, "high": 342.8, "low": 331.32, "close": 333.62, "pre_close": 349.65, "pct_chg": -4.5846, "vol": 441473.0, "amount": 14799949.1, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260511.0, "open": 349.59, "high": 366.98, "low": 346.51, "close": 361.6, "pre_close": 333.62, "pct_chg": 8.3868, "vol": 575914.0, "amount": 20643876.74, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260512.0, "open": 361.61, "high": 361.67, "low": 348.69, "close": 353.04, "pre_close": 361.6, "pct_chg": -2.3673, "vol": 406184.0, "amount": 14339771.54, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260513.0, "open": 343.5, "high": 366.18, "low": 338.84, "close": 364.47, "pre_close": 353.04, "pct_chg": 3.2376, "vol": 485687.0, "amount": 17102568.92, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260514.0, "open": 364.52, "high": 372.96, "low": 354.48, "close": 355.67, "pre_close": 364.47, "pct_chg": -2.4145, "vol": 408958.0, "amount": 14807962.65, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260515.0, "open": 352.49, "high": 383.44, "low": 344.98, "close": 374.8, "pre_close": 355.67, "pct_chg": 5.3786, "vol": 625275.0, "amount": 22759153.49, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260518.0, "open": 407.99, "high": 412.27, "low": 395.77, "close": 399.42, "pre_close": 374.8, "pct_chg": 6.5688, "vol": 688983.0, "amount": 27835959.87, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260519.0, "open": 389.43, "high": 409.41, "low": 379.47, "close": 403.97, "pre_close": 399.42, "pct_chg": 1.1392, "vol": 553904.0, "amount": 21773783.7, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260520.0, "open": 407.41, "high": 444.37, "low": 407.21, "close": 444.37, "pre_close": 403.97, "pct_chg": 10.0007, "vol": 611011.0, "amount": 26485076.29, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260521.0, "open": 444.37, "high": 464.16, "low": 426.71, "close": 431.27, "pre_close": 444.37, "pct_chg": -2.948, "vol": 633316.0, "amount": 28158519.51, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260522.0, "open": 447.35, "high": 472.3, "low": 438.36, "close": 468.06, "pre_close": 431.27, "pct_chg": 8.5306, "vol": 638895.0, "amount": 28890127.82, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260525.0, "open": 477.42, "high": 514.86, "low": 460.33, "close": 514.85, "pre_close": 468.06, "pct_chg": 9.9966, "vol": 594476.0, "amount": 29345108.64, "adj_factor": 5.6479}, {"ts_code": "603986.SH", "trade_date": 20260526.0, "open": 510.0, "high": 538.02, "low": 491.2, "close": 526.22, "pre_close": 514.85, "pct_chg": 2.2084, "vol": 643384.0, "amount": 33017657.44, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260527.0, "open": 541.0, "high": 552.82, "low": 500.0, "close": 514.18, "pre_close": 526.22, "pct_chg": -2.288, "vol": 667260.0, "amount": 35341222.58, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260528.0, "open": 495.0, "high": 499.5, "low": 470.0, "close": 483.0, "pre_close": 514.18, "pct_chg": -6.064, "vol": 623792.0, "amount": 30240489.78, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260529.0, "open": 492.66, "high": 496.0, "low": 464.91, "close": 467.01, "pre_close": 483.0, "pct_chg": -3.3106, "vol": 558125.0, "amount": 26715074.21, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260601.0, "open": 476.0, "high": 489.96, "low": 455.0, "close": 468.0, "pre_close": 467.01, "pct_chg": 0.212, "vol": 521586.0, "amount": 24676174.09, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260602.0, "open": 471.0, "high": 480.66, "low": 448.11, "close": 474.69, "pre_close": 468.0, "pct_chg": 1.4295, "vol": 490193.0, "amount": 23013728.74, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260603.0, "open": 478.89, "high": 510.0, "low": 477.0, "close": 492.23, "pre_close": 474.69, "pct_chg": 3.695, "vol": 581930.0, "amount": 28838934.89, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260604.0, "open": 487.05, "high": 538.0, "low": 485.01, "close": 529.31, "pre_close": 492.23, "pct_chg": 7.5331, "vol": 563351.0, "amount": 29302244.79, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260605.0, "open": 507.0, "high": 519.8, "low": 484.9, "close": 488.0, "pre_close": 529.31, "pct_chg": -7.8045, "vol": 547135.0, "amount": 27565110.09, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260608.0, "open": 461.11, "high": 490.7, "low": 451.0, "close": 474.01, "pre_close": 488.0, "pct_chg": -2.8668, "vol": 434475.0, "amount": 20573934.02, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260609.0, "open": 493.0, "high": 502.88, "low": 477.03, "close": 500.5, "pre_close": 474.01, "pct_chg": 5.5885, "vol": 419683.0, "amount": 20592669.38, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260610.0, "open": 489.11, "high": 497.26, "low": 475.65, "close": 480.84, "pre_close": 500.5, "pct_chg": -3.9281, "vol": 329972.0, "amount": 15988381.63, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260611.0, "open": 480.52, "high": 486.0, "low": 471.0, "close": 483.5, "pre_close": 480.84, "pct_chg": 0.5532, "vol": 296991.0, "amount": 14211235.7, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260612.0, "open": 508.0, "high": 510.0, "low": 481.0, "close": 481.47, "pre_close": 483.5, "pct_chg": -0.4199, "vol": 407085.0, "amount": 20201561.53, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260615.0, "open": 494.97, "high": 519.0, "low": 476.66, "close": 518.0, "pre_close": 481.47, "pct_chg": 7.5872, "vol": 475784.0, "amount": 23934989.16, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260616.0, "open": 526.0, "high": 542.84, "low": 517.71, "close": 532.76, "pre_close": 518.0, "pct_chg": 2.8494, "vol": 427785.0, "amount": 22673887.61, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260617.0, "open": 521.0, "high": 586.04, "low": 521.0, "close": 586.04, "pre_close": 532.76, "pct_chg": 10.0008, "vol": 568000.0, "amount": 31598894.53, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260618.0, "open": 594.0, "high": 644.64, "low": 586.6, "close": 629.0, "pre_close": 586.04, "pct_chg": 7.3306, "vol": 591573.0, "amount": 37016387.91, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260622.0, "open": 643.0, "high": 689.7, "low": 635.0, "close": 689.7, "pre_close": 629.0, "pct_chg": 9.6502, "vol": 525831.0, "amount": 34699907.69, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260623.0, "open": 680.0, "high": 688.8, "low": 636.0, "close": 640.99, "pre_close": 689.7, "pct_chg": -7.0625, "vol": 592914.0, "amount": 39089605.51, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260624.0, "open": 641.0, "high": 705.09, "low": 630.93, "close": 705.09, "pre_close": 640.99, "pct_chg": 10.0002, "vol": 598219.0, "amount": 39944848.28, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260625.0, "open": 740.0, "high": 775.39, "low": 735.0, "close": 775.21, "pre_close": 705.09, "pct_chg": 9.9448, "vol": 508678.0, "amount": 38432771.37, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260626.0, "open": 753.0, "high": 779.0, "low": 732.52, "close": 770.0, "pre_close": 775.21, "pct_chg": -0.6721, "vol": 493926.0, "amount": 37418302.89, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260629.0, "open": 779.0, "high": 846.66, "low": 750.0, "close": 840.0, "pre_close": 770.0, "pct_chg": 9.0909, "vol": 541209.0, "amount": 43149934.64, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260630.0, "open": 810.0, "high": 833.0, "low": 781.11, "close": 815.0, "pre_close": 840.0, "pct_chg": -2.9762, "vol": 449647.0, "amount": 36399346.13, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260701.0, "open": 803.0, "high": 843.38, "low": 753.0, "close": 772.01, "pre_close": 815.0, "pct_chg": -5.2748, "vol": 539702.0, "amount": 43202850.8, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260702.0, "open": 721.0, "high": 731.99, "low": 694.81, "close": 694.81, "pre_close": 772.01, "pct_chg": -9.9999, "vol": 452436.0, "amount": 32120680.67, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260703.0, "open": 672.54, "high": 717.66, "low": 642.35, "close": 677.77, "pre_close": 694.81, "pct_chg": -2.4525, "vol": 623522.0, "amount": 42673730.27, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260706.0, "open": 690.0, "high": 694.99, "low": 630.0, "close": 654.29, "pre_close": 677.77, "pct_chg": -3.4643, "vol": 601502.0, "amount": 39768631.63, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260707.0, "open": 625.0, "high": 646.2, "low": 607.0, "close": 620.0, "pre_close": 654.29, "pct_chg": -5.2408, "vol": 515651.0, "amount": 32272585.84, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260708.0, "open": 630.0, "high": 641.0, "low": 589.0, "close": 603.17, "pre_close": 620.0, "pct_chg": -2.7145, "vol": 575108.0, "amount": 35494320.0, "adj_factor": 5.6561}, {"ts_code": "603986.SH", "trade_date": 20260709.0, "open": 633.0, "high": 663.49, "low": 630.0, "close": 663.49, "pre_close": 603.17, "pct_chg": 10.0005, "vol": 590920.0, "amount": 38185017.35, "adj_factor": 5.6561}] }
+};
+
+const BENCHMARK_MAP = {
+  '000300': { name: '沪深300', data: [{"trade_date": 20250710.0, "close": 4010.0243, "pct_chg": 0.4666}, {"trade_date": 20250711.0, "close": 4014.807, "pct_chg": 0.1193}, {"trade_date": 20250714.0, "close": 4017.6678, "pct_chg": 0.0713}, {"trade_date": 20250715.0, "close": 4019.0644, "pct_chg": 0.0348}, {"trade_date": 20250716.0, "close": 4007.2019, "pct_chg": -0.2952}, {"trade_date": 20250717.0, "close": 4034.491, "pct_chg": 0.681}, {"trade_date": 20250718.0, "close": 4058.5486, "pct_chg": 0.5963}, {"trade_date": 20250721.0, "close": 4085.6072, "pct_chg": 0.6667}, {"trade_date": 20250722.0, "close": 4118.9582, "pct_chg": 0.8163}, {"trade_date": 20250723.0, "close": 4119.7685, "pct_chg": 0.0197}, {"trade_date": 20250724.0, "close": 4149.0368, "pct_chg": 0.7104}, {"trade_date": 20250725.0, "close": 4127.1634, "pct_chg": -0.5272}, {"trade_date": 20250728.0, "close": 4135.8242, "pct_chg": 0.2098}, {"trade_date": 20250729.0, "close": 4152.0247, "pct_chg": 0.3917}, {"trade_date": 20250730.0, "close": 4151.2379, "pct_chg": -0.0189}, {"trade_date": 20250731.0, "close": 4075.5912, "pct_chg": -1.8223}, {"trade_date": 20250801.0, "close": 4054.9286, "pct_chg": -0.507}, {"trade_date": 20250804.0, "close": 4070.7023, "pct_chg": 0.389}, {"trade_date": 20250805.0, "close": 4103.45, "pct_chg": 0.8045}, {"trade_date": 20250806.0, "close": 4113.4852, "pct_chg": 0.2446}, {"trade_date": 20250807.0, "close": 4114.666, "pct_chg": 0.0287}, {"trade_date": 20250808.0, "close": 4104.9669, "pct_chg": -0.2357}, {"trade_date": 20250811.0, "close": 4122.5106, "pct_chg": 0.4274}, {"trade_date": 20250812.0, "close": 4143.8252, "pct_chg": 0.517}, {"trade_date": 20250813.0, "close": 4176.5776, "pct_chg": 0.7904}, {"trade_date": 20250814.0, "close": 4173.3131, "pct_chg": -0.0782}, {"trade_date": 20250815.0, "close": 4202.3533, "pct_chg": 0.6959}, {"trade_date": 20250818.0, "close": 4239.4125, "pct_chg": 0.8819}, {"trade_date": 20250819.0, "close": 4223.3741, "pct_chg": -0.3783}, {"trade_date": 20250820.0, "close": 4271.3958, "pct_chg": 1.137}, {"trade_date": 20250821.0, "close": 4288.0707, "pct_chg": 0.3904}, {"trade_date": 20250822.0, "close": 4377.9977, "pct_chg": 2.0971}, {"trade_date": 20250825.0, "close": 4469.2217, "pct_chg": 2.0837}, {"trade_date": 20250826.0, "close": 4452.5905, "pct_chg": -0.3721}, {"trade_date": 20250827.0, "close": 4386.1266, "pct_chg": -1.4927}, {"trade_date": 20250828.0, "close": 4463.782, "pct_chg": 1.7705}, {"trade_date": 20250829.0, "close": 4496.7591, "pct_chg": 0.7388}, {"trade_date": 20250901.0, "close": 4523.7111, "pct_chg": 0.5994}, {"trade_date": 20250902.0, "close": 4490.4528, "pct_chg": -0.7352}, {"trade_date": 20250903.0, "close": 4459.8296, "pct_chg": -0.682}, {"trade_date": 20250904.0, "close": 4365.2085, "pct_chg": -2.1216}, {"trade_date": 20250905.0, "close": 4460.3249, "pct_chg": 2.179}, {"trade_date": 20250908.0, "close": 4467.5733, "pct_chg": 0.1625}, {"trade_date": 20250909.0, "close": 4436.2584, "pct_chg": -0.7009}, {"trade_date": 20250910.0, "close": 4445.3649, "pct_chg": 0.2053}, {"trade_date": 20250911.0, "close": 4548.0345, "pct_chg": 2.3096}, {"trade_date": 20250912.0, "close": 4521.998, "pct_chg": -0.5725}, {"trade_date": 20250915.0, "close": 4533.0557, "pct_chg": 0.2445}, {"trade_date": 20250916.0, "close": 4523.3367, "pct_chg": -0.2144}, {"trade_date": 20250917.0, "close": 4551.023, "pct_chg": 0.6121}, {"trade_date": 20250918.0, "close": 4498.109, "pct_chg": -1.1627}, {"trade_date": 20250919.0, "close": 4501.9195, "pct_chg": 0.0847}, {"trade_date": 20250922.0, "close": 4522.608, "pct_chg": 0.4595}, {"trade_date": 20250923.0, "close": 4519.7781, "pct_chg": -0.0626}, {"trade_date": 20250924.0, "close": 4566.0708, "pct_chg": 1.0242}, {"trade_date": 20250925.0, "close": 4593.4875, "pct_chg": 0.6004}, {"trade_date": 20250926.0, "close": 4550.0487, "pct_chg": -0.9457}, {"trade_date": 20250929.0, "close": 4620.0528, "pct_chg": 1.5385}, {"trade_date": 20250930.0, "close": 4640.6935, "pct_chg": 0.4468}, {"trade_date": 20251009.0, "close": 4709.482, "pct_chg": 1.4823}, {"trade_date": 20251010.0, "close": 4616.8341, "pct_chg": -1.9673}, {"trade_date": 20251013.0, "close": 4593.9785, "pct_chg": -0.495}, {"trade_date": 20251014.0, "close": 4539.0644, "pct_chg": -1.1953}, {"trade_date": 20251015.0, "close": 4606.2879, "pct_chg": 1.481}, {"trade_date": 20251016.0, "close": 4618.4218, "pct_chg": 0.2634}, {"trade_date": 20251017.0, "close": 4514.2345, "pct_chg": -2.2559}, {"trade_date": 20251020.0, "close": 4538.2201, "pct_chg": 0.5313}, {"trade_date": 20251021.0, "close": 4607.8715, "pct_chg": 1.5348}, {"trade_date": 20251022.0, "close": 4592.57, "pct_chg": -0.3321}, {"trade_date": 20251023.0, "close": 4606.3447, "pct_chg": 0.2999}, {"trade_date": 20251024.0, "close": 4660.6835, "pct_chg": 1.1797}, {"trade_date": 20251027.0, "close": 4716.0186, "pct_chg": 1.1873}, {"trade_date": 20251028.0, "close": 4691.973, "pct_chg": -0.5099}, {"trade_date": 20251029.0, "close": 4747.8378, "pct_chg": 1.1906}, {"trade_date": 20251030.0, "close": 4709.911, "pct_chg": -0.7988}, {"trade_date": 20251031.0, "close": 4640.6676, "pct_chg": -1.4702}, {"trade_date": 20251103.0, "close": 4653.4028, "pct_chg": 0.2744}, {"trade_date": 20251104.0, "close": 4618.699, "pct_chg": -0.7458}, {"trade_date": 20251105.0, "close": 4627.257, "pct_chg": 0.1853}, {"trade_date": 20251106.0, "close": 4693.4032, "pct_chg": 1.4295}, {"trade_date": 20251107.0, "close": 4678.7944, "pct_chg": -0.3113}, {"trade_date": 20251110.0, "close": 4695.0507, "pct_chg": 0.3474}, {"trade_date": 20251111.0, "close": 4652.1655, "pct_chg": -0.9134}, {"trade_date": 20251112.0, "close": 4645.9079, "pct_chg": -0.1345}, {"trade_date": 20251113.0, "close": 4702.0738, "pct_chg": 1.2089}, {"trade_date": 20251114.0, "close": 4628.1398, "pct_chg": -1.5724}, {"trade_date": 20251117.0, "close": 4598.0525, "pct_chg": -0.6501}, {"trade_date": 20251118.0, "close": 4568.1928, "pct_chg": -0.6494}, {"trade_date": 20251119.0, "close": 4588.2922, "pct_chg": 0.44}, {"trade_date": 20251120.0, "close": 4564.9483, "pct_chg": -0.5088}, {"trade_date": 20251121.0, "close": 4453.6076, "pct_chg": -2.439}, {"trade_date": 20251124.0, "close": 4448.0478, "pct_chg": -0.1248}, {"trade_date": 20251125.0, "close": 4490.4047, "pct_chg": 0.9523}, {"trade_date": 20251126.0, "close": 4517.6255, "pct_chg": 0.6062}, {"trade_date": 20251127.0, "close": 4515.4027, "pct_chg": -0.0492}, {"trade_date": 20251128.0, "close": 4526.6616, "pct_chg": 0.2493}, {"trade_date": 20251201.0, "close": 4576.4856, "pct_chg": 1.1007}, {"trade_date": 20251202.0, "close": 4554.3347, "pct_chg": -0.484}, {"trade_date": 20251203.0, "close": 4531.0486, "pct_chg": -0.5113}, {"trade_date": 20251204.0, "close": 4546.5664, "pct_chg": 0.3425}, {"trade_date": 20251205.0, "close": 4584.5368, "pct_chg": 0.8351}, {"trade_date": 20251208.0, "close": 4621.7545, "pct_chg": 0.8118}, {"trade_date": 20251209.0, "close": 4598.2232, "pct_chg": -0.5091}, {"trade_date": 20251210.0, "close": 4591.8273, "pct_chg": -0.1391}, {"trade_date": 20251211.0, "close": 4552.1848, "pct_chg": -0.8633}, {"trade_date": 20251212.0, "close": 4580.95, "pct_chg": 0.6319}, {"trade_date": 20251215.0, "close": 4552.0596, "pct_chg": -0.6307}, {"trade_date": 20251216.0, "close": 4497.5545, "pct_chg": -1.1974}, {"trade_date": 20251217.0, "close": 4579.875, "pct_chg": 1.8303}, {"trade_date": 20251218.0, "close": 4552.7926, "pct_chg": -0.5913}, {"trade_date": 20251219.0, "close": 4568.1781, "pct_chg": 0.3379}, {"trade_date": 20251222.0, "close": 4611.6235, "pct_chg": 0.951}, {"trade_date": 20251223.0, "close": 4620.7341, "pct_chg": 0.1976}, {"trade_date": 20251224.0, "close": 4634.0586, "pct_chg": 0.2884}, {"trade_date": 20251225.0, "close": 4642.5357, "pct_chg": 0.1829}, {"trade_date": 20251226.0, "close": 4657.24, "pct_chg": 0.3167}, {"trade_date": 20251229.0, "close": 4639.3721, "pct_chg": -0.3837}, {"trade_date": 20251230.0, "close": 4651.2818, "pct_chg": 0.2567}, {"trade_date": 20251231.0, "close": 4629.9395, "pct_chg": -0.4588}, {"trade_date": 20260105.0, "close": 4717.7457, "pct_chg": 1.8965}, {"trade_date": 20260106.0, "close": 4790.6938, "pct_chg": 1.5462}, {"trade_date": 20260107.0, "close": 4776.6658, "pct_chg": -0.2928}, {"trade_date": 20260108.0, "close": 4737.6536, "pct_chg": -0.8167}, {"trade_date": 20260109.0, "close": 4758.9221, "pct_chg": 0.4489}, {"trade_date": 20260112.0, "close": 4789.9155, "pct_chg": 0.6513}, {"trade_date": 20260113.0, "close": 4761.0324, "pct_chg": -0.603}, {"trade_date": 20260114.0, "close": 4741.9306, "pct_chg": -0.4012}, {"trade_date": 20260115.0, "close": 4751.4293, "pct_chg": 0.2003}, {"trade_date": 20260116.0, "close": 4731.8728, "pct_chg": -0.4116}, {"trade_date": 20260119.0, "close": 4734.4556, "pct_chg": 0.0546}, {"trade_date": 20260120.0, "close": 4718.8782, "pct_chg": -0.329}, {"trade_date": 20260121.0, "close": 4723.0692, "pct_chg": 0.0888}, {"trade_date": 20260122.0, "close": 4723.7091, "pct_chg": 0.0135}, {"trade_date": 20260123.0, "close": 4702.4966, "pct_chg": -0.4491}, {"trade_date": 20260126.0, "close": 4706.964, "pct_chg": 0.095}, {"trade_date": 20260127.0, "close": 4705.6918, "pct_chg": -0.027}, {"trade_date": 20260128.0, "close": 4717.9914, "pct_chg": 0.2614}, {"trade_date": 20260129.0, "close": 4753.8697, "pct_chg": 0.7605}, {"trade_date": 20260130.0, "close": 4706.3401, "pct_chg": -0.9998}, {"trade_date": 20260202.0, "close": 4605.9799, "pct_chg": -2.1324}, {"trade_date": 20260203.0, "close": 4660.1074, "pct_chg": 1.1752}, {"trade_date": 20260204.0, "close": 4698.6832, "pct_chg": 0.8278}, {"trade_date": 20260205.0, "close": 4670.4188, "pct_chg": -0.6015}, {"trade_date": 20260206.0, "close": 4643.5959, "pct_chg": -0.5743}, {"trade_date": 20260209.0, "close": 4719.0559, "pct_chg": 1.625}, {"trade_date": 20260210.0, "close": 4724.2956, "pct_chg": 0.111}, {"trade_date": 20260211.0, "close": 4713.8185, "pct_chg": -0.2218}, {"trade_date": 20260212.0, "close": 4719.578, "pct_chg": 0.1222}, {"trade_date": 20260213.0, "close": 4660.4056, "pct_chg": -1.2538}, {"trade_date": 20260224.0, "close": 4707.544, "pct_chg": 1.0115}, {"trade_date": 20260225.0, "close": 4735.8858, "pct_chg": 0.6021}, {"trade_date": 20260226.0, "close": 4726.8739, "pct_chg": -0.1903}, {"trade_date": 20260227.0, "close": 4710.6469, "pct_chg": -0.3433}, {"trade_date": 20260302.0, "close": 4728.6688, "pct_chg": 0.3826}, {"trade_date": 20260303.0, "close": 4655.8962, "pct_chg": -1.539}, {"trade_date": 20260304.0, "close": 4602.6247, "pct_chg": -1.1442}, {"trade_date": 20260305.0, "close": 4647.6921, "pct_chg": 0.9792}, {"trade_date": 20260306.0, "close": 4660.439, "pct_chg": 0.2743}, {"trade_date": 20260309.0, "close": 4615.4551, "pct_chg": -0.9652}, {"trade_date": 20260310.0, "close": 4674.7562, "pct_chg": 1.2848}, {"trade_date": 20260311.0, "close": 4704.4959, "pct_chg": 0.6362}, {"trade_date": 20260312.0, "close": 4687.5601, "pct_chg": -0.36}, {"trade_date": 20260313.0, "close": 4669.14, "pct_chg": -0.393}, {"trade_date": 20260316.0, "close": 4671.5591, "pct_chg": 0.0518}, {"trade_date": 20260317.0, "close": 4637.4392, "pct_chg": -0.7304}, {"trade_date": 20260318.0, "close": 4658.3324, "pct_chg": 0.4505}, {"trade_date": 20260319.0, "close": 4583.2511, "pct_chg": -1.6118}, {"trade_date": 20260320.0, "close": 4567.0179, "pct_chg": -0.3542}, {"trade_date": 20260323.0, "close": 4417.9971, "pct_chg": -3.263}, {"trade_date": 20260324.0, "close": 4474.7224, "pct_chg": 1.284}, {"trade_date": 20260325.0, "close": 4537.4656, "pct_chg": 1.4022}, {"trade_date": 20260326.0, "close": 4477.5343, "pct_chg": -1.3208}, {"trade_date": 20260327.0, "close": 4502.5698, "pct_chg": 0.5591}, {"trade_date": 20260330.0, "close": 4491.95, "pct_chg": -0.2359}, {"trade_date": 20260331.0, "close": 4450.0493, "pct_chg": -0.9328}, {"trade_date": 20260401.0, "close": 4526.0668, "pct_chg": 1.7082}, {"trade_date": 20260402.0, "close": 4478.9141, "pct_chg": -1.0418}, {"trade_date": 20260403.0, "close": 4440.7889, "pct_chg": -0.8512}, {"trade_date": 20260407.0, "close": 4440.6162, "pct_chg": -0.0039}, {"trade_date": 20260408.0, "close": 4595.556, "pct_chg": 3.4892}, {"trade_date": 20260409.0, "close": 4566.2237, "pct_chg": -0.6383}, {"trade_date": 20260410.0, "close": 4636.5655, "pct_chg": 1.5405}, {"trade_date": 20260413.0, "close": 4646.1546, "pct_chg": 0.2068}, {"trade_date": 20260414.0, "close": 4701.2837, "pct_chg": 1.1866}, {"trade_date": 20260415.0, "close": 4685.2464, "pct_chg": -0.3411}, {"trade_date": 20260416.0, "close": 4736.6077, "pct_chg": 1.0962}, {"trade_date": 20260417.0, "close": 4728.6716, "pct_chg": -0.1675}, {"trade_date": 20260420.0, "close": 4757.4419, "pct_chg": 0.6084}, {"trade_date": 20260421.0, "close": 4767.997, "pct_chg": 0.2219}, {"trade_date": 20260422.0, "close": 4799.627, "pct_chg": 0.6634}, {"trade_date": 20260423.0, "close": 4786.3273, "pct_chg": -0.2771}, {"trade_date": 20260424.0, "close": 4769.3688, "pct_chg": -0.3543}, {"trade_date": 20260427.0, "close": 4770.9469, "pct_chg": 0.0331}, {"trade_date": 20260428.0, "close": 4758.2083, "pct_chg": -0.267}, {"trade_date": 20260429.0, "close": 4810.3468, "pct_chg": 1.0958}, {"trade_date": 20260430.0, "close": 4807.3069, "pct_chg": -0.0632}, {"trade_date": 20260506.0, "close": 4877.0932, "pct_chg": 1.4517}, {"trade_date": 20260507.0, "close": 4900.5098, "pct_chg": 0.4801}, {"trade_date": 20260508.0, "close": 4871.9122, "pct_chg": -0.5836}, {"trade_date": 20260511.0, "close": 4951.8366, "pct_chg": 1.6405}, {"trade_date": 20260512.0, "close": 4948.0465, "pct_chg": -0.0765}, {"trade_date": 20260513.0, "close": 4998.3417, "pct_chg": 1.0165}, {"trade_date": 20260514.0, "close": 4914.5971, "pct_chg": -1.6754}, {"trade_date": 20260515.0, "close": 4859.5927, "pct_chg": -1.1192}, {"trade_date": 20260518.0, "close": 4833.5237, "pct_chg": -0.5364}, {"trade_date": 20260519.0, "close": 4852.8832, "pct_chg": 0.4005}, {"trade_date": 20260520.0, "close": 4850.7, "pct_chg": -0.045}, {"trade_date": 20260521.0, "close": 4783.0976, "pct_chg": -1.3937}, {"trade_date": 20260522.0, "close": 4845.0956, "pct_chg": 1.2962}, {"trade_date": 20260525.0, "close": 4921.5974, "pct_chg": 1.579}, {"trade_date": 20260526.0, "close": 4947.8493, "pct_chg": 0.5334}, {"trade_date": 20260527.0, "close": 4908.1714, "pct_chg": -0.8019}, {"trade_date": 20260528.0, "close": 4914.2133, "pct_chg": 0.1231}, {"trade_date": 20260529.0, "close": 4892.1213, "pct_chg": -0.4496}, {"trade_date": 20260601.0, "close": 4844.2556, "pct_chg": -0.9784}, {"trade_date": 20260602.0, "close": 4914.5591, "pct_chg": 1.4513}, {"trade_date": 20260603.0, "close": 4938.8091, "pct_chg": 0.4934}, {"trade_date": 20260604.0, "close": 4904.7454, "pct_chg": -0.6897}, {"trade_date": 20260605.0, "close": 4816.9199, "pct_chg": -1.7906}, {"trade_date": 20260608.0, "close": 4713.6358, "pct_chg": -2.1442}, {"trade_date": 20260609.0, "close": 4801.8106, "pct_chg": 1.8706}, {"trade_date": 20260610.0, "close": 4748.5932, "pct_chg": -1.1083}, {"trade_date": 20260611.0, "close": 4722.4122, "pct_chg": -0.5513}, {"trade_date": 20260612.0, "close": 4777.3206, "pct_chg": 1.1627}, {"trade_date": 20260615.0, "close": 4891.7126, "pct_chg": 2.3945}, {"trade_date": 20260616.0, "close": 4884.2322, "pct_chg": -0.1529}, {"trade_date": 20260617.0, "close": 4931.3861, "pct_chg": 0.9654}, {"trade_date": 20260618.0, "close": 4941.5986, "pct_chg": 0.2071}, {"trade_date": 20260622.0, "close": 5059.6582, "pct_chg": 2.3891}, {"trade_date": 20260623.0, "close": 4919.386, "pct_chg": -2.7724}, {"trade_date": 20260624.0, "close": 4943.0197, "pct_chg": 0.4804}, {"trade_date": 20260625.0, "close": 5020.1038, "pct_chg": 1.5595}, {"trade_date": 20260626.0, "close": 4868.2205, "pct_chg": -3.0255}, {"trade_date": 20260629.0, "close": 4926.921, "pct_chg": 1.2058}, {"trade_date": 20260630.0, "close": 4979.4328, "pct_chg": 1.0658}, {"trade_date": 20260701.0, "close": 4958.9773, "pct_chg": -0.4108}, {"trade_date": 20260702.0, "close": 4812.2957, "pct_chg": -2.9579}, {"trade_date": 20260703.0, "close": 4842.1737, "pct_chg": 0.6209}, {"trade_date": 20260706.0, "close": 4841.998, "pct_chg": -0.0036}, {"trade_date": 20260707.0, "close": 4792.2624, "pct_chg": -1.0272}, {"trade_date": 20260708.0, "close": 4755.5338, "pct_chg": -0.7664}, {"trade_date": 20260709.0, "close": 4876.3125, "pct_chg": 2.5398}, {"trade_date": 20260710.0, "close": 4780.7867, "pct_chg": -1.959}] }
+};
+
+// ========================================
+// 数据加载
+// ========================================
+// loadCSV已移除（数据直接嵌入）
+  const text = await resp.text();
+  if (!text || text.trim().startsWith('Not found')) {
+    throw new Error('数据文件不存在: ' + path + '。请检查outputs目录下是否有对应的CSV文件。');
+  }
+  const lines = text.trim().split('\n');
+  const headers = lines[0].replace(/^\uFEFF/, '').split(',');
+  const data = lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h.trim()] = vals[i] ? vals[i].trim() : ''; });
+    return obj;
+  });
+  console.log('[数据加载] 解析行数:', data.length, '列名:', Object.keys(data[0] || {}));
+  return data;
+}
+
+function loadStockData(code) {
+  const info = STOCK_MAP[code];
+  if (!info) throw new Error('未找到股票代码: ' + code);
+  return { name: info.name, data: info.data };
+}
+
+function loadBenchmarkData(code) {
+  if (code === 'fixed02') return null;
+  const info = BENCHMARK_MAP[code];
+  if (!info) throw new Error('未找到基准: ' + code);
+  return { name: info.name, data: info.data };
+};
+}
+
+// ========================================
+// 回测引擎
+// ========================================
+function runBacktestEngine(stockData, params) {
+  const { shortPeriod, longPeriod, initCash, commissionRate, slippage, lotSize, startDate, endDate } = params;
+
+  // 过滤日期范围
+  let data = stockData.filter(d => {
+    const dt = d.trade_date;
+    const sd = startDate.replace(/-/g, '');
+    const ed = endDate.replace(/-/g, '');
+    return dt >= sd && dt <= ed;
+  });
+
+  if (data.length < longPeriod) {
+    return { error: '数据不足：需要至少 ' + longPeriod + ' 个交易日，当前仅 ' + data.length + ' 个' };
+  }
+
+  // 计算均线
+  const closes = data.map(d => parseFloat(d.close));
+  const dates = data.map(d => d.trade_date);
+
+  function SMA(arr, n, i) {
+    if (i < n - 1) return null;
+    let sum = 0;
+    for (let j = i - n + 1; j <= i; j++) sum += arr[j];
+    return sum / n;
+  }
+
+  const maShort = closes.map((_, i) => SMA(closes, shortPeriod, i));
+  const maLong = closes.map((_, i) => SMA(closes, longPeriod, i));
+
+  // 生成信号
+  const signals = data.map((_, i) => {
+    if (i < longPeriod || maShort[i - 1] === null || maLong[i - 1] === null) return 0;
+    const prevAbove = maShort[i - 1] > maLong[i - 1];
+    const currAbove = maShort[i] > maLong[i];
+    if (!prevAbove && currAbove) return 1;   // 金叉买入
+    if (prevAbove && !currAbove) return -1;  // 死叉卖出
+    return 0;
+  });
+
+  // 模拟交易
+  let cash = initCash;
+  let shares = 0;
+  let position = false; // false=空仓, true=持仓
+  const feeRate = commissionRate / 100;
+  const slipRate = slippage / 100;
+
+  const navSeries = [];
+  const trades = [];
+  let tradeCount = 0;
+
+  // 追踪完整交易（买入→卖出配对）用于胜率/盈亏比
+  let buyEntry = null; // { price, fee, totalCost }
+
+  for (let i = 0; i < data.length; i++) {
+    const price = closes[i];
+    const signal = signals[i];
+
+    if (signal === 1 && !position) {
+      // 买入
+      const buyPrice = price * (1 + slipRate);
+      const maxShares = Math.floor(cash / (buyPrice * (1 + feeRate)));
+      const actualShares = Math.floor(maxShares / lotSize) * lotSize;
+      if (actualShares <= 0) {
+        navSeries.push(cash);
+        continue;
+      }
+      const buyFee = buyPrice * actualShares * feeRate;
+      const totalCost = buyPrice * actualShares + buyFee;
+      cash -= totalCost;
+      shares = actualShares;
+      position = true;
+      buyEntry = { price: buyPrice, fee: buyFee, totalCost: totalCost, shares: actualShares, navAtBuy: cash + shares * price };
+      tradeCount++;
+      trades.push({
+        idx: tradeCount,
+        date: dates[i],
+        direction: '买入',
+        execPrice: buyPrice.toFixed(2),
+        shares: actualShares,
+        fee: buyFee.toFixed(2),
+        position: '持仓',
+        nav: (cash + shares * price).toFixed(2),
+        pnl: '--'
+      });
+    } else if (signal === -1 && position) {
+      // 卖出
+      const sellPrice = price * (1 - slipRate);
+      const sellFee = sellPrice * shares * feeRate;
+      const sellIncome = sellPrice * shares - sellFee;
+      cash += sellIncome;
+
+      // 计算本次盈亏
+      const totalBuyCost = buyEntry.totalCost;
+      const totalSellIncome = sellIncome;
+      const pnlPct = ((totalSellIncome - totalBuyCost) / totalBuyCost * 100).toFixed(2);
+
+      trades.push({
+        idx: tradeCount,
+        date: dates[i],
+        direction: '卖出',
+        execPrice: sellPrice.toFixed(2),
+        shares: shares,
+        fee: sellFee.toFixed(2),
+        position: '空仓',
+        nav: cash.toFixed(2),
+        pnl: pnlPct + '%'
+      });
+
+      position = false;
+      shares = 0;
+      buyEntry = null;
+    }
+
+    // 当日净值
+    const nav = position ? (cash + shares * price) : cash;
+    navSeries.push(nav);
+  }
+
+  // 强制最后一天卖出（如果仍持仓）
+  if (position && data.length > 0) {
+    const lastPrice = closes[data.length - 1] * (1 - slipRate);
+    const lastFee = lastPrice * shares * feeRate;
+    cash += lastPrice * shares - lastFee;
+    if (buyEntry) {
+      const pnlPct = ((cash - buyEntry.totalCost + buyEntry.fee) / buyEntry.totalCost * 100).toFixed(2);
+      trades.push({
+        idx: tradeCount + 1,
+        date: dates[data.length - 1],
+        direction: '卖出(强制)',
+        execPrice: lastPrice.toFixed(2),
+        shares: shares,
+        fee: lastFee.toFixed(2),
+        position: '空仓',
+        nav: cash.toFixed(2),
+        pnl: pnlPct + '%'
+      });
+    }
+    position = false;
+    shares = 0;
+    navSeries[navSeries.length - 1] = cash;
+  }
+
+  // ========================================
+  // 计算量化指标
+  // ========================================
+
+  // 日收益率序列
+  const dailyReturns = navSeries.map((nav, i) => i === 0 ? 0 : (nav / navSeries[i - 1] - 1));
+
+  // 总收益率
+  const totalReturn = (navSeries[navSeries.length - 1] - initCash) / initCash;
+
+  // 年化收益率
+  const tradingDays = navSeries.length;
+  const annualReturn = Math.pow(1 + totalReturn, 365 / tradingDays) - 1;
+
+  // 最大回撤
+  let maxDD = 0;
+  let peakNav = navSeries[0];
+  let ddSeries = [];
+  for (let i = 0; i < navSeries.length; i++) {
+    if (navSeries[i] > peakNav) peakNav = navSeries[i];
+    const dd = (navSeries[i] - peakNav) / peakNav;
+    ddSeries.push(dd);
+    if (dd < maxDD) maxDD = dd;
+  }
+
+  // 胜率 & 盈亏比（配对交易）
+  const pairedTrades = [];
+  for (let i = 0; i < trades.length; i++) {
+    if (trades[i].direction.includes('买入')) {
+      const buyTrade = trades[i];
+      const sellIdx = trades.findIndex(t => t.direction.includes('卖出') && t.idx === buyTrade.idx);
+      if (sellIdx > i) {
+        pairedTrades.push({ buy: buyTrade, sell: trades[sellIdx] });
+      }
+    }
+  }
+
+  // 更好的配对方式
+  const completeTrades = [];
+  let currentBuy = null;
+  for (const t of trades) {
+    if (t.direction.includes('买入')) {
+      currentBuy = t;
+    } else if (t.direction.includes('卖出') && currentBuy) {
+      const pnlVal = parseFloat(t.pnl.replace('%', ''));
+      completeTrades.push({ pnl: pnlVal, buyDate: currentBuy.date, sellDate: t.date });
+      currentBuy = null;
+    }
+  }
+
+  const wins = completeTrades.filter(t => t.pnl > 0);
+  const losses = completeTrades.filter(t => t.pnl <= 0);
+  const winRate = completeTrades.length > 0 ? wins.length / completeTrades.length : 0;
+
+  const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.pnl, 0) / losses.length) : 0;
+  const plRatio = avgLoss > 0 ? avgWin / avgLoss : wins.length > 0 ? Infinity : 0;
+
+  // 夏普比率
+  const rfDaily = 0.02 / 252;
+  const excessDailyReturns = dailyReturns.map(r => r - rfDaily);
+  const meanExcess = excessDailyReturns.reduce((s, r) => s + r, 0) / excessDailyReturns.length;
+  const stdDev = Math.sqrt(excessDailyReturns.reduce((s, r) => s + Math.pow(r - meanExcess, 2), 0) / excessDailyReturns.length);
+  const sharpe = stdDev > 0 ? (meanExcess / stdDev) * Math.sqrt(252) : 0;
+
+  return {
+    dates, closes, maShort, maLong, signals, navSeries, ddSeries, dailyReturns,
+    totalReturn, annualReturn, maxDD, winRate, plRatio, sharpe,
+    trades, completeTrades, wins, losses, avgWin, avgLoss,
+    tradingDays, initCash, finalNav: navSeries[navSeries.length - 1],
+    error: null
+  };
+}
+
+// ========================================
+// 基准收益计算
+// ========================================
+function calcBenchmarkReturn(benchmarkData, startDate, endDate) {
+  if (!benchmarkData) return 0.02 * 0.99; // 银行定存2%，约1年
+  const sd = startDate.replace(/-/g, '');
+  const ed = endDate.replace(/-/g, '');
+  const filtered = benchmarkData.filter(d => d.trade_date >= sd && d.trade_date <= ed);
+  if (filtered.length < 2) return 0;
+  const startVal = parseFloat(filtered[0].close);
+  const endVal = parseFloat(filtered[filtered.length - 1].close);
+  return (endVal - startVal) / startVal;
+}
+
+function calcBenchmarkNavSeries(benchmarkData, startDate, endDate, initCash) {
+  if (!benchmarkData) {
+    // 银行定存：线性增长
+    const sd = startDate.replace(/-/g, '');
+    const ed = endDate.replace(/-/g, '');
+    const days = Math.round((new Date(ed) - new Date(sd)) / (1000 * 86400));
+    const dailyRate = 0.02 / 365;
+    return Array.from({ length: Math.max(days, 1) }, (_, i) => initCash * Math.pow(1 + dailyRate, i));
+  }
+  const sd = startDate.replace(/-/g, '');
+  const ed = endDate.replace(/-/g, '');
+  const filtered = benchmarkData.filter(d => d.trade_date >= sd && d.trade_date <= ed);
+  if (filtered.length < 2) return [];
+  const startVal = parseFloat(filtered[0].close);
+  return filtered.map(d => initCash * parseFloat(d.close) / startVal);
+}
+
+// ========================================
+// 可视化渲染
+// ========================================
+let mainChart, navChart, drawdownChart;
+
+function destroyCharts() {
+  if (mainChart) mainChart.destroy();
+  if (navChart) navChart.destroy();
+  if (drawdownChart) drawdownChart.destroy();
+}
+
+function formatDates(dates) {
+  return dates.map(d => {
+    const y = d.substring(0, 4);
+    const m = d.substring(4, 6);
+    const dd = d.substring(6, 8);
+    return m + '-' + dd;
+  });
+}
+
+function renderCharts(result, benchmarkNav) {
+  destroyCharts();
+  const labels = formatDates(result.dates);
+
+  // 颜色数组（涨红跌绿）
+  const candleColors = result.closes.map((c, i) => {
+    if (i === 0) return '#888780';
+    return c >= result.closes[i - 1] ? '#E24B4A' : '#639922';
+  });
+
+  // 买入/卖出信号点
+  const buyPoints = result.signals.map((s, i) => s === 1 ? result.closes[i] : null);
+  const sellPoints = result.signals.map((s, i) => s === -1 ? result.closes[i] : null);
+
+  // 主图：收盘价 + 双均线 + 信号
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '收盘价(前复权)',
+          data: result.closes,
+          borderColor: '#888780',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          order: 3
+        },
+        {
+          label: 'MA' + document.getElementById('shortPeriod').value,
+          data: result.maShort,
+          borderColor: '#378ADD',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          order: 2
+        },
+        {
+          label: 'MA' + document.getElementById('longPeriod').value,
+          data: result.maLong,
+          borderColor: '#D85A30',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          order: 1
+        },
+        {
+          label: '买入信号',
+          data: buyPoints,
+          borderColor: '#639922',
+          backgroundColor: '#639922',
+          pointRadius: 8,
+          pointStyle: 'triangle',
+          showLine: false,
+          order: 0
+        },
+        {
+          label: '卖出信号',
+          data: sellPoints,
+          borderColor: '#E24B4A',
+          backgroundColor: '#E24B4A',
+          pointRadius: 8,
+          pointStyle: 'triangle',
+          rotation: 180,
+          showLine: false,
+          order: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, pointStyleWidth: 10, font: { size: 12 } }
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const idx = items[0].dataIndex;
+              return result.dates[idx];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxTicksLimit: 15,
+            maxRotation: 45,
+            font: { size: 11 }
+          }
+        },
+        y: {
+          ticks: { font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // 净值曲线
+  const benchLabels = benchmarkNav.length <= result.navSeries.length
+    ? labels.slice(0, benchmarkNav.length)
+    : labels;
+
+  navChart = new Chart(document.getElementById('navChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '策略净值',
+          data: result.navSeries,
+          borderColor: '#378ADD',
+          backgroundColor: 'rgba(55,138,221,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true
+        },
+        {
+          label: '基准净值',
+          data: benchmarkNav.length === result.navSeries.length ? benchmarkNav : benchmarkNav.slice(0, result.navSeries.length),
+          borderColor: '#888780',
+          backgroundColor: 'rgba(136,135,128,0.05)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, font: { size: 12 } } }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 11 } } },
+        y: { ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // 回撤曲线
+  drawdownChart = new Chart(document.getElementById('drawdownChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '回撤 (%)',
+          data: result.ddSeries.map(d => d * 100),
+          borderColor: '#E24B4A',
+          backgroundColor: 'rgba(226,75,74,0.12)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: (item) => '回撤: ' + item.raw.toFixed(2) + '%'
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 12, font: { size: 11 } } },
+        y: {
+          ticks: {
+            callback: (v) => v.toFixed(1) + '%',
+            font: { size: 11 }
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderMetrics(result, benchmarkReturn) {
+  const excessReturn = result.totalReturn - benchmarkReturn;
+
+  const fmtPct = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+  const fmtNum = (v) => v.toFixed(2);
+
+  document.getElementById('mTotalReturn').textContent = fmtPct(result.totalReturn);
+  document.getElementById('mAnnualReturn').textContent = fmtPct(result.annualReturn);
+  document.getElementById('mExcessReturn').textContent = fmtPct(excessReturn);
+  document.getElementById('mMaxDrawdown').textContent = fmtPct(result.maxDD);
+  document.getElementById('mWinRate').textContent = (result.winRate * 100).toFixed(1) + '%';
+  document.getElementById('mPLRatio').textContent = result.plRatio === Infinity ? 'Inf' : fmtNum(result.plRatio);
+  document.getElementById('mSharpe').textContent = fmtNum(result.sharpe);
+
+  // 颜色调整
+  const cards = document.querySelectorAll('.metric-card');
+  const excessCard = cards[2];
+  if (excessReturn < 0) excessCard.classList.add('negative');
+  else excessCard.classList.remove('negative');
+  excessCard.classList.remove('positive');
+  if (excessReturn >= 0) excessCard.classList.add('positive');
+
+  const winCard = cards[4];
+  if (result.winRate >= 0.5) winCard.classList.add('positive');
+  else winCard.classList.add('negative');
+
+  const plCard = cards[5];
+  if (result.plRatio >= 2) plCard.classList.add('positive');
+  else if (result.plRatio < 1) plCard.classList.add('negative');
+}
+
+function renderTrades(result) {
+  const tbody = document.getElementById('tradesBody');
+  tbody.innerHTML = '';
+  for (const t of result.trades) {
+    const row = document.createElement('tr');
+    const cls = t.direction.includes('买入') ? 'buy' : 'sell';
+    row.className = cls;
+    row.innerHTML =
+      '<td>' + t.idx + '</td>' +
+      '<td>' + t.date + '</td>' +
+      '<td class="direction">' + t.direction + '</td>' +
+      '<td>' + t.execPrice + '</td>' +
+      '<td>' + t.shares + '</td>' +
+      '<td>' + t.fee + '</td>' +
+      '<td>' + t.position + '</td>' +
+      '<td>' + t.nav + '</td>' +
+      '<td>' + t.pnl + '</td>';
+    tbody.appendChild(row);
+  }
+  document.getElementById('btnExport').style.display = 'inline-block';
+}
+
+// ========================================
+// 主流程
+// ========================================
+function runBacktest() {
+  const code = document.getElementById('stockCode').value.trim();
+  const benchmarkCode = document.getElementById('benchmarkSelect').value;
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const shortP = parseInt(document.getElementById('shortPeriod').value);
+  const longP = parseInt(document.getElementById('longPeriod').value);
+  const initCash = parseFloat(document.getElementById('initCash').value);
+  const commission = parseFloat(document.getElementById('commissionRate').value);
+  const slip = parseFloat(document.getElementById('slippage').value);
+  const lotSize = parseInt(document.getElementById('lotSize').value);
+
+  // 校验
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  if (!code || !STOCK_MAP[code]) {
+    errEl.textContent = '未找到股票代码: ' + code + '，目前支持: ' + Object.keys(STOCK_MAP).join(', ');
+    errEl.style.display = 'block';
+    return;
+  }
+  if (longP <= shortP) {
+    errEl.textContent = '长均线周期必须大于短均线周期';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!startDate || !endDate) {
+    errEl.textContent = '请设置时间范围';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true;
+  btn.textContent = '正在回测...';
+
+  try {
+    // 加载股票数据
+    console.log('[回测] 开始加载股票数据:', code);
+    const stock = await loadStockData(code);
+    console.log('[回测] 股票数据加载成功:', stock.name, stock.data.length, '条');
+    
+    // 加载基准数据
+    const benchmark = await loadBenchmarkData(benchmarkCode);
+    console.log('[回测] 基准数据:', benchmarkCode, benchmark ? benchmark.data.length + '条' : '银行定存2%');
+
+    // 运行回测引擎
+    const params = {
+      shortPeriod: shortP,
+      longPeriod: longP,
+      initCash: initCash,
+      commissionRate: commission,
+      slippage: slip,
+      lotSize: lotSize,
+      startDate: startDate,
+      endDate: endDate
+    };
+
+    const result = runBacktestEngine(stock.data, params);
+    console.log('[回测] 回测完成:', result.error ? 'ERROR: ' + result.error : '成功');
+    console.log('[回测] 总收益率:', (result.totalReturn * 100).toFixed(2) + '%');
+    console.log('[回测] navSeries长度:', result.navSeries.length, '首值:', result.navSeries[0], '末值:', result.navSeries[result.navSeries.length-1]);
+
+    if (result.error) {
+      errEl.textContent = result.error;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '运行回测';
+      return;
+    }
+
+    // 计算基准收益
+    const benchReturn = calcBenchmarkReturn(benchmark ? benchmark.data : null, startDate, endDate);
+    const benchNav = calcBenchmarkNavSeries(benchmark ? benchmark.data : null, startDate, endDate, initCash);
+    console.log('[回测] 基准收益:', (benchReturn * 100).toFixed(2) + '%');
+
+    // 渲染
+    renderCharts(result, benchNav);
+    renderMetrics(result, benchReturn);
+    renderTrades(result);
+
+    // 存储结果供导出
+    window._backtestResult = result;
+
+  } catch (e) {
+    console.error('[回测] 错误:', e);
+    errEl.textContent = '错误: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '运行回测';
+  }
+}
+
+// ========================================
+// 导出CSV
+// ========================================
+function exportTradesCSV() {
+  const result = window._backtestResult;
+  if (!result) return;
+
+  const headers = ['#', '日期', '方向', '成交价', '股数', '手续费', '持仓状态', '净值', '本次盈亏'];
+  const rows = result.trades.map(t =>
+    [t.idx, t.date, t.direction, t.execPrice, t.shares, t.fee, t.position, t.nav, t.pnl].join(',')
+  );
+
+  const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '双均线回测交易记录.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// 页面加载完成后自动运行一次回测
+window.addEventListener('DOMContentLoaded', () => {
+  runBacktest();
+});
+</script>
+</body>
+</html>
