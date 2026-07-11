@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>双均线策略100股批量回测结果</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+    background: #1a1a2e; color: #eee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 20px; line-height: 1.6;
+}
+.container { max-width: 1400px; margin: 0 auto; }
+
+h1 { 
+    text-align: center; font-size: 28px; color: #f0f0f0; 
+    margin-bottom: 5px; letter-spacing: 2px;
+}
+.subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 25px; }
+
+/* 顶部统计卡片 */
+.stats-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px;
+}
+.stat-card {
+    background: #16213e; border-radius: 10px; padding: 18px 15px;
+    border: 1px solid #0f3460; text-align: center;
+}
+.stat-card .label { font-size: 12px; color: #888; margin-bottom: 5px; }
+.stat-card .value { font-size: 24px; font-weight: bold; }
+.stat-card .value.red { color: #e74c3c; }
+.stat-card .value.green { color: #2ecc71; }
+.stat-card .value.gold { color: #f1c40f; }
+.stat-card .value.blue { color: #3498db; }
+.stat-card .sub { font-size: 11px; color: #666; margin-top: 3px; }
+
+/* 策略对比区块 */
+.section { margin-bottom: 25px; }
+.section-title {
+    font-size: 18px; color: #f0f0f0; padding: 10px 15px;
+    background: #16213e; border-radius: 8px; margin-bottom: 15px;
+    border-left: 4px solid #e94560;
+}
+
+/* 表格 */
+table {
+    width: 100%; border-collapse: collapse; background: #16213e;
+    border-radius: 8px; overflow: hidden; margin-bottom: 20px;
+}
+thead { background: #0f3460; }
+th { 
+    padding: 10px 8px; font-size: 12px; color: #aaa; text-align: center;
+    white-space: nowrap; border-bottom: 2px solid #e94560;
+}
+td { 
+    padding: 8px 6px; font-size: 13px; text-align: center;
+    border-bottom: 1px solid #1a2a4a;
+}
+tr:hover { background: #1a3a5e; }
+
+.red-cell { color: #e74c3c; }
+.green-cell { color: #2ecc71; }
+.neutral-cell { color: #aaa; }
+
+/* 策略类型对比卡片 */
+.type-cards {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px;
+}
+.type-card {
+    background: #16213e; border-radius: 10px; padding: 15px;
+    border: 2px solid #0f3460; position: relative;
+}
+.type-card .type-name {
+    font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 10px;
+}
+.type-card.short { border-color: #e74c3c; }
+.type-card.mid { border-color: #f1c40f; }
+.type-card.long { border-color: #2ecc71; }
+.type-card.ultra { border-color: #3498db; }
+.type-card .metric-row {
+    display: flex; justify-content: space-between; padding: 3px 0;
+    font-size: 13px;
+}
+.type-card .metric-row .ml { color: #888; }
+.type-card .metric-row .mv { font-weight: bold; }
+
+/* 行业TOP5 */
+.industry-block {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;
+}
+.industry-panel {
+    background: #16213e; border-radius: 8px; padding: 15px;
+}
+.industry-panel h3 { font-size: 14px; margin-bottom: 10px; }
+.industry-panel .best { color: #2ecc71; }
+.industry-panel .worst { color: #e74c3c; }
+
+/* 结论 */
+.conclusion {
+    background: #16213e; border-radius: 10px; padding: 20px;
+    border: 1px solid #e94560; margin-bottom: 20px;
+}
+.conclusion h3 { color: #e94560; margin-bottom: 10px; }
+.conclusion ul { list-style: none; padding: 0; }
+.conclusion li {
+    padding: 6px 0; font-size: 14px; 
+    border-bottom: 1px solid #1a2a4a;
+}
+.conclusion li:last-child { border-bottom: none; }
+.conclusion li .num { color: #f1c40f; font-weight: bold; display: inline-block; width: 24px; }
+
+/* 搜索筛选 */
+.filter-bar {
+    display: flex; gap: 10px; margin-bottom: 15px; align-items: center;
+}
+.filter-bar select, .filter-bar input {
+    background: #16213e; color: #eee; border: 1px solid #0f3460;
+    padding: 8px 12px; border-radius: 6px; font-size: 14px;
+}
+.filter-bar select:focus, .filter-bar input:focus {
+    outline: none; border-color: #e94560;
+}
+
+/* 排序按钮 */
+.sort-btn {
+    background: #0f3460; color: #aaa; border: none;
+    padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px;
+}
+.sort-btn:hover { background: #e94560; color: #fff; }
+.sort-btn.active { background: #e94560; color: #fff; }
+
+.tab-btn {
+    background: #16213e; color: #888; border: 1px solid #0f3460;
+    padding: 8px 16px; cursor: pointer; font-size: 13px; border-radius: 6px;
+}
+.tab-btn:hover { background: #0f3460; color: #eee; }
+.tab-btn.active { background: #e94560; color: #fff; border-color: #e94560; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 双均线策略批量回测结果</h1>
+    <div class="subtitle">100支热门A股 × 8种均线组合 × 4.5年回测 | 2022.01 — 2026.07</div>
+
+    <!-- 顶部统计 -->
+    <div class="stats-grid" id="topStats"></div>
+
+    <!-- 策略类型对比卡片 -->
+    <div class="section">
+        <div class="section-title">📈 四类策略表现对比</div>
+        <div class="type-cards" id="typeCards"></div>
+    </div>
+
+    <!-- 均线组合详细表 -->
+    <div class="section">
+        <div class="section-title">📉 各均线组合表现汇总</div>
+        <table id="comboTable">
+            <thead>
+                <tr>
+                    <th>均线组合</th><th>类型</th><th>样本数</th>
+                    <th>平均收益率</th><th>中位数收益率</th><th>盈利占比</th>
+                    <th>夏普比率</th><th>最大回撤</th><th>胜率</th><th>盈亏比</th><th>交易次数</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- 行业适用性 -->
+    <div class="section">
+        <div class="section-title">🏆 行业适用性分析（各策略TOP5行业 vs 最差行业）</div>
+        <div class="industry-block" id="industryBlock"></div>
+    </div>
+
+    <!-- 详细回测结果表 -->
+    <div class="section">
+        <div class="section-title">🔍 785条详细回测记录</div>
+        <div class="filter-bar">
+            <select id="filterType"><option value="">全部策略类型</option><option value="短线">短线</option><option value="中线">中线</option><option value="长线">长线</option><option value="超长线">超长线</option></select>
+            <select id="filterIndustry"><option value="">全部行业</option></select>
+            <input id="filterStock" placeholder="搜索股票代码/名称" style="width:200px;">
+            <button class="tab-btn" onclick="exportCSV()">📥 导出CSV</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table id="detailTable">
+                <thead>
+                    <tr>
+                        <th>股票代码</th><th>名称</th><th>行业</th><th>策略类型</th><th>均线组合</th>
+                        <th>总收益率</th><th>年化收益率</th><th>超额收益</th><th>最大回撤</th>
+                        <th>胜率</th><th>盈亏比</th><th>夏普比率</th><th>交易次数</th>
+                    </tr>
+                </thead>
+                <tbody id="detailBody"></tbody>
+            </table>
+        </div>
+        <div style="text-align:center;color:#888;padding:10px;" id="pageInfo"></div>
+    </div>
+
+    <!-- 结论 -->
+    <div class="conclusion" id="conclusionBlock"></div>
+</div>
+
+<script>
+// ========== 数据 ==========
+const BACKTEST_DATA = [];
+const COMBO_SUMMARY = [];
+const TYPE_SUMMARY = [];
+const CROSS_SUMMARY = [];
+const INDUSTRY_SUMMARY = [];
+
+// 加载CSV数据（同步方式，使用fetch）
+async function loadData() {
+    // 详细回测结果
+    const detailResp = await fetch('/outputs/dual_ma_backtest_100stocks.csv');
+    const detailText = await detailResp.text();
+    parseCSV(detailText, BACKTEST_DATA);
+
+    // 组合汇总
+    const comboResp = await fetch('/outputs/summary_combo.csv');
+    const comboText = await comboResp.text();
+    parseCSV(comboText, COMBO_SUMMARY);
+
+    // 类型汇总
+    const typeResp = await fetch('/outputs/summary_type.csv');
+    const typeText = await typeResp.text();
+    parseCSV(typeText, TYPE_SUMMARY);
+
+    // 行业汇总
+    const indResp = await fetch('/outputs/summary_industry.csv');
+    const indText = await indResp.text();
+    parseCSV(indText, INDUSTRY_SUMMARY);
+
+    // 交叉汇总
+    const crossResp = await fetch('/outputs/summary_cross.csv');
+    const crossText = await crossResp.text();
+    parseCSV(crossText, CROSS_SUMMARY);
+
+    renderAll();
+}
+
+function parseCSV(text, arr) {
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',');
+    for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].split(',');
+        const obj = {};
+        headers.forEach((h, j) => obj[h.trim()] = (vals[j] || '').trim());
+        arr.push(obj);
+    }
+}
+
+function fmt(val, decimals=2) {
+    if (val === '' || val === undefined || isNaN(parseFloat(val))) return '-';
+    return parseFloat(val).toFixed(decimals);
+}
+function pct(val) {
+    if (val === '' || val === undefined) return '-';
+    const n = parseFloat(val);
+    if (isNaN(n)) return '-';
+    const color = n > 0 ? 'green-cell' : (n < 0 ? 'red-cell' : 'neutral-cell');
+    return `<span class="${color}">${(n*100).toFixed(2)}%</span>`;
+}
+function num(val) {
+    if (val === '' || val === undefined) return '-';
+    const n = parseFloat(val);
+    if (isNaN(n)) return '-';
+    const color = n > 0 ? 'green-cell' : (n < 0 ? 'red-cell' : 'neutral-cell');
+    return `<span class="${color}">${n.toFixed(2)}</span>`;
+}
+
+// ========== 渲染 ==========
+function renderAll() {
+    renderTopStats();
+    renderTypeCards();
+    renderComboTable();
+    renderIndustryBlock();
+    renderDetailTable();
+    renderConclusion();
+}
+
+function renderTopStats() {
+    const total = BACKTEST_DATA.length;
+    const profit = BACKTEST_DATA.filter(d => parseFloat(d.total_return) > 0).length;
+    const avgRet = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.total_return || 0), 0) / total;
+    const avgSharpe = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.sharpe_ratio || 0), 0) / total;
+    const avgDD = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.max_drawdown || 0), 0) / total;
+    const stocks = new Set(BACKTEST_DATA.map(d => d.ts_code)).size;
+    const industries = new Set(BACKTEST_DATA.map(d => d.industry)).size;
+
+    document.getElementById('topStats').innerHTML = `
+        <div class="stat-card"><div class="label">回测股票数</div><div class="value gold">${stocks}</div><div class="sub">${industries}个行业</div></div>
+        <div class="stat-card"><div class="label">回测记录数</div><div class="value blue">${total}</div><div class="sub">8种均线组合</div></div>
+        <div class="stat-card"><div class="label">盈利占比</div><div class="value ${profit/total > 0.5 ? 'green' : 'red'}">${(profit/total*100).toFixed(1)}%</div><div class="sub">${profit}条盈利 / ${total-profit}条亏损</div></div>
+        <div class="stat-card"><div class="label">平均收益率</div><div class="value ${avgRet > 0 ? 'green' : 'red'}">${(avgRet*100).toFixed(2)}%</div><div class="sub">平均夏普=${avgSharpe.toFixed(2)}</div></div>
+    `;
+}
+
+function renderTypeCards() {
+    const colors = { '短线': 'short', '中线': 'mid', '长线': 'long', '超长线': 'ultra' };
+    const colorHex = { '短线': '#e74c3c', '中线': '#f1c40f', '长线': '#2ecc71', '超长线': '#3498db' };
+    let html = '';
+    TYPE_SUMMARY.forEach(row => {
+        const cls = colors[row.strategy_type] || '';
+        html += `
+        <div class="type-card ${cls}">
+            <div class="type-name" style="color:${colorHex[row.strategy_type]}">${row.strategy_type}</div>
+            <div class="metric-row"><span class="ml">样本数</span><span class="mv">${row.sample_count}</span></div>
+            <div class="metric-row"><span class="ml">平均收益率</span><span class="mv" style="color:${parseFloat(row.avg_total_return)>0?'#2ecc71':'#e74c3c'}">${(parseFloat(row.avg_total_return)*100).toFixed(2)}%</span></div>
+            <div class="metric-row"><span class="ml">盈利占比</span><span class="mv">${(parseFloat(row.profit_pct)*100).toFixed(1)}%</span></div>
+            <div class="metric-row"><span class="ml">夏普比率</span><span class="mv">${parseFloat(row.avg_sharpe_ratio).toFixed(2)}</span></div>
+            <div class="metric-row"><span class="ml">最大回撤</span><span class="mv" style="color:#e74c3c">${(parseFloat(row.avg_max_drawdown)*100).toFixed(2)}%</span></div>
+            <div class="metric-row"><span class="ml">胜率</span><span class="mv">${(parseFloat(row.avg_win_rate)*100).toFixed(1)}%</span></div>
+            <div class="metric-row"><span class="ml">盈亏比</span><span class="mv">${parseFloat(row.avg_pl_ratio).toFixed(2)}</span></div>
+        </div>`;
+    });
+    document.getElementById('typeCards').innerHTML = html;
+}
+
+function renderComboTable() {
+    let html = '';
+    COMBO_SUMMARY.forEach(row => {
+        html += `<tr>
+            <td><b>${row.ma_combo}</b></td><td>${row.strategy_type}</td><td>${row.sample_count}</td>
+            ${pct(row.avg_total_return)}${pct(row.median_total_return)}${pct(row.profit_pct)}
+            ${num(row.avg_sharpe_ratio)}${pct(row.avg_max_drawdown)}${pct(row.avg_win_rate)}
+            ${num(row.avg_pl_ratio)}<td>${parseFloat(row.avg_trade_count).toFixed(1)}</td>
+        </tr>`;
+    });
+    document.getElementById('comboTable').querySelector('tbody').innerHTML = html;
+}
+
+function renderIndustryBlock() {
+    const types = ['短线', '中线', '长线', '超长线'];
+    const typeNames = { '短线': '短线 (MA5×)', '中线': '中线 (MA10-30×)', '长线': '长线 (MA20-60×)', '超长线': '超长线 (MA60×)' };
+    let html = '';
+    types.forEach(t => {
+        const rows = CROSS_SUMMARY.filter(r => r.strategy_type === t)
+            .sort((a, b) => parseFloat(b.avg_sharpe) - parseFloat(a.avg_sharpe));
+        const best5 = rows.slice(0, 5);
+        const worst3 = rows.slice(-3).reverse();
+        
+        html += `<div class="industry-panel">
+            <h3 style="color:#f1c40f">${typeNames[t]} 最佳行业</h3>`;
+        best5.forEach(r => {
+            html += `<div class="best">🟢 ${r.industry}: 夏普=${parseFloat(r.avg_sharpe).toFixed(2)}, 收益=${(parseFloat(r.avg_return)*100).toFixed(1)}%, 回撤=${(parseFloat(r.avg_drawdown)*100).toFixed(1)}%</div>`;
+        });
+        html += `<h3 style="color:#e74c3c;margin-top:10px">最差行业</h3>`;
+        worst3.forEach(r => {
+            html += `<div class="worst">🔴 ${r.industry}: 夏普=${parseFloat(r.avg_sharpe).toFixed(2)}, 收益=${(parseFloat(r.avg_return)*100).toFixed(1)}%</div>`;
+        });
+        html += `</div>`;
+    });
+    document.getElementById('industryBlock').innerHTML = html;
+}
+
+// ========== 详细回测表格 ==========
+let filteredData = [];
+let currentPage = 0;
+const PAGE_SIZE = 50;
+
+function renderDetailTable() {
+    // 初始化行业筛选器
+    const industries = [...new Set(BACKTEST_DATA.map(d => d.industry))].sort();
+    const sel = document.getElementById('filterIndustry');
+    industries.forEach(ind => {
+        const opt = document.createElement('option');
+        opt.value = ind; opt.text = ind;
+        sel.appendChild(opt);
+    });
+
+    applyFilter();
+}
+
+function applyFilter() {
+    const typeFilter = document.getElementById('filterType').value;
+    const indFilter = document.getElementById('filterIndustry').value;
+    const stockFilter = document.getElementById('filterStock').value.toLowerCase();
+
+    filteredData = BACKTEST_DATA.filter(d => {
+        if (typeFilter && d.strategy_type !== typeFilter) return false;
+        if (indFilter && d.industry !== indFilter) return false;
+        if (stockFilter && !(d.ts_code.toLowerCase().includes(stockFilter) || d.name.toLowerCase().includes(stockFilter))) return false;
+        return true;
+    });
+
+    currentPage = 0;
+    renderPage();
+}
+
+function renderPage() {
+    const start = currentPage * PAGE_SIZE;
+    const pageData = filteredData.slice(start, start + PAGE_SIZE);
+    
+    let html = '';
+    pageData.forEach(d => {
+        html += `<tr>
+            <td>${d.ts_code}</td><td>${d.name}</td><td>${d.industry}</td>
+            <td>${d.strategy_type}</td><td>${d.ma_combo}</td>
+            ${pct(d.total_return)}${pct(d.annualized_return)}${pct(d.excess_return)}
+            ${pct(d.max_drawdown)}${pct(d.win_rate)}${num(d.pl_ratio)}
+            ${num(d.sharpe_ratio)}<td>${d.trade_count}</td>
+        </tr>`;
+    });
+    document.getElementById('detailBody').innerHTML = html;
+
+    const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+    document.getElementById('pageInfo').innerHTML = 
+        `显示 ${start+1}-${Math.min(start+PAGE_SIZE, filteredData.length)} / 共${filteredData.length}条 | 
+         <button class="tab-btn" onclick="currentPage=Math.max(0,currentPage-1);renderPage()">上一页</button>
+         第${currentPage+1}/${totalPages}页
+         <button class="tab-btn" onclick="currentPage=Math.min(totalPages-1,currentPage+1);renderPage()">下一页</button>`;
+}
+
+function exportCSV() {
+    let csv = 'ts_code,name,industry,strategy_type,ma_combo,total_return,annualized_return,excess_return,max_drawdown,win_rate,pl_ratio,sharpe_ratio,trade_count\n';
+    filteredData.forEach(d => {
+        csv += `${d.ts_code},${d.name},${d.industry},${d.strategy_type},${d.ma_combo},${d.total_return},${d.annualized_return},${d.excess_return},${d.max_drawdown},${d.win_rate},${d.pl_ratio},${d.sharpe_ratio},${d.trade_count}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'dual_ma_backtest_100stocks.csv';
+    a.click(); URL.revokeObjectURL(url);
+}
+
+// 事件绑定
+document.getElementById('filterType').addEventListener('change', applyFilter);
+document.getElementById('filterIndustry').addEventListener('change', applyFilter);
+document.getElementById('filterStock').addEventListener('input', applyFilter);
+
+// 结论
+function renderConclusion() {
+    const total = BACKTEST_DATA.length;
+    const profitPct = BACKTEST_DATA.filter(d => parseFloat(d.total_return) > 0).length / total;
+    const avgWin = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.win_rate || 0), 0) / total;
+    const avgPL = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.pl_ratio || 0), 0) / total;
+    const avgDD = BACKTEST_DATA.reduce((s, d) => s + parseFloat(d.max_drawdown || 0), 0) / total;
+
+    // 找出最佳/最差均线
+    const bestCombo = COMBO_SUMMARY.reduce((a, b) => parseFloat(a.avg_sharpe_ratio) > parseFloat(b.avg_sharpe_ratio) ? a : b);
+    const worstCombo = COMBO_SUMMARY.reduce((a, b) => parseFloat(a.avg_sharpe_ratio) < parseFloat(b.avg_sharpe_ratio) ? a : b);
+
+    // 找出最赚钱/最亏钱的股票
+    const bestStock = BACKTEST_DATA.reduce((a, b) => parseFloat(a.total_return) > parseFloat(b.total_return) ? a : b);
+    const worstStock = BACKTEST_DATA.reduce((a, b) => parseFloat(a.total_return) < parseFloat(b.total_return) ? a : b);
+
+    document.getElementById('conclusionBlock').innerHTML = `
+        <h3>💡 双均线策略核心发现与应用心得</h3>
+        <ul>
+            <li><span class="num">1.</span> <b>残酷现实：</b>仅${(profitPct*100).toFixed(1)}%的回测组合盈利——双均线不是万能策略，2022-2026年A股震荡市对其极其不利</li>
+            <li><span class="num">2.</span> <b>最佳均线组合：</b>${bestCombo.ma_combo}（夏普=${parseFloat(bestCombo.avg_sharpe_ratio).toFixed(2)}），最差：${worstCombo.ma_combo}（夏普=${parseFloat(worstCombo.avg_sharpe_ratio).toFixed(2)}）</li>
+            <li><span class="num">3.</span> <b>最赚钱：</b>${bestStock.name}(${bestStock.ts_code}) ${bestStock.ma_combo} 收益=${(parseFloat(bestStock.total_return)*100).toFixed(1)}%</li>
+            <li><span class="num">4.</span> <b>最亏钱：</b>${worstStock.name}(${worstStock.ts_code}) ${worstStock.ma_combo} 收益=${(parseFloat(worstStock.total_return)*100).toFixed(1)}%</li>
+            <li><span class="num">5.</span> <b>胜率不重要，盈亏比更重要：</b>平均胜率仅${(avgWin*100).toFixed(1)}%，但盈亏比达${avgPL.toFixed(2)}——低胜率+高盈亏比也能盈利</li>
+            <li><span class="num">6.</span> <b>最大回撤是真实风险：</b>平均回撤${(avgDD*100).toFixed(1)}%，超过30%很难坚持持有</li>
+            <li><span class="num">7.</span> <b>趋势为王：</b>双均线本质是趋势跟踪策略，只在有明确趋势时赚钱——震荡市必亏</li>
+            <li><span class="num">8.</span> <b>周期越长越稳：</b>长线策略盈利占比最高(38.4%)，短线最差(30.3%)</li>
+            <li><span class="num">9.</span> <b>行业差异巨大：</b>游戏、互联网、半导体、黄金矿业最适合；医疗器械、房地产、中药最不适合</li>
+            <li><span class="num">10.</span> <b>实战建议：</b>①选趋势股而非震荡股 ②长线优先(MA20/MA60) ③叠加成交量确认 ④严格止损 ⑤回撤>25%减仓</li>
+        </ul>
+    `;
+}
+
+// ========== 启动 ==========
+loadData();
+</script>
+</body>
+</html>
