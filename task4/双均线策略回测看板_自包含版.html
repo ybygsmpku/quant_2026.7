@@ -332,22 +332,7 @@ const BENCHMARK_MAP = {
 // ========================================
 // 数据加载
 // ========================================
-// loadCSV已移除（数据直接嵌入）
-  const text = await resp.text();
-  if (!text || text.trim().startsWith('Not found')) {
-    throw new Error('数据文件不存在: ' + path + '。请检查outputs目录下是否有对应的CSV文件。');
-  }
-  const lines = text.trim().split('\n');
-  const headers = lines[0].replace(/^\uFEFF/, '').split(',');
-  const data = lines.slice(1).map(line => {
-    const vals = line.split(',');
-    const obj = {};
-    headers.forEach((h, i) => { obj[h.trim()] = vals[i] ? vals[i].trim() : ''; });
-    return obj;
-  });
-  console.log('[数据加载] 解析行数:', data.length, '列名:', Object.keys(data[0] || {}));
-  return data;
-}
+// loadCSV已移除（数据直接嵌入STOCK_MAP和BENCHMARK_MAP）
 
 function loadStockData(code) {
   const info = STOCK_MAP[code];
@@ -361,7 +346,6 @@ function loadBenchmarkData(code) {
   if (!info) throw new Error('未找到基准: ' + code);
   return { name: info.name, data: info.data };
 };
-}
 
 // ========================================
 // 回测引擎
@@ -918,11 +902,11 @@ function runBacktest() {
   try {
     // 加载股票数据
     console.log('[回测] 开始加载股票数据:', code);
-    const stock = await loadStockData(code);
+    const stock = loadStockData(code);
     console.log('[回测] 股票数据加载成功:', stock.name, stock.data.length, '条');
     
     // 加载基准数据
-    const benchmark = await loadBenchmarkData(benchmarkCode);
+    const benchmark = loadBenchmarkData(benchmarkCode);
     console.log('[回测] 基准数据:', benchmarkCode, benchmark ? benchmark.data.length + '条' : '银行定存2%');
 
     // 运行回测引擎
