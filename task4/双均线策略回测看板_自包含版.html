@@ -332,7 +332,7 @@ const BENCHMARK_MAP = {
 // ========================================
 // 数据加载
 // ========================================
-// loadCSV已移除（数据直接嵌入STOCK_MAP和BENCHMARK_MAP）
+// loadCSV removed - data embedded in STOCK_MAP and BENCHMARK_MAP
 
 function loadStockData(code) {
   const info = STOCK_MAP[code];
@@ -345,7 +345,7 @@ function loadBenchmarkData(code) {
   const info = BENCHMARK_MAP[code];
   if (!info) throw new Error('未找到基准: ' + code);
   return { name: info.name, data: info.data };
-};
+}
 
 // ========================================
 // 回测引擎
